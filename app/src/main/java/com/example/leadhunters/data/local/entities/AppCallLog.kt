@@ -1,0 +1,19 @@
+package com.example.leadhunters.data.local.entities
+
+import androidx.room.Entity
+import androidx.room.PrimaryKey
+
+@Entity(tableName = "app_call_logs")
+data class AppCallLog(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val leadId: String,
+    val phoneNumber: String,
+    val startTime: Long,
+    val endTime: Long? = null,
+    val duration: Long? = null,
+    val type: String, // OUTGOING, INCOMING, etc.
+    val status: String, // CONNECTED, MISSED, REJECTED, CANCELLED
+    val recordingPath: String? = null,
+    val systemCallLogId: Long? = null,
+    val isReconciled: Boolean = false
+)
