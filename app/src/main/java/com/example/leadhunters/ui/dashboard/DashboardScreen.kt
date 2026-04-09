@@ -4,6 +4,7 @@ import android.content.Intent
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.CallMissed
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -17,7 +18,7 @@ import com.example.leadhunters.data.local.dao.CallStats
 import com.example.leadhunters.ui.components.AppMetricTile
 import com.example.leadhunters.ui.components.AppSectionHeader
 import com.example.leadhunters.ui.theme.SuccessEmerald
-import com.example.leadhunters.ui.theme.WarningAmber
+import com.example.leadhunters.ui.theme.WarningStatus
 import com.example.leadhunters.ui.theme.ErrorCoral
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -31,33 +32,31 @@ fun DashboardScreen(
 
     Scaffold(
         topBar = {
-            LargeTopAppBar(
+            TopAppBar(
                 title = { Text("Performance", fontWeight = FontWeight.Bold) },
-                colors = TopAppBarDefaults.largeTopAppBarColors(
+                colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background,
                     titleContentColor = MaterialTheme.colorScheme.primary
-                )
-            )
-        },
-        floatingActionButton = {
-            ExtendedFloatingActionButton(
-                onClick = {
-                    val summary = viewModel.getShareSummary()
-                    val intent = Intent(Intent.ACTION_SEND).apply {
-                        type = "text/plain"
-                        `package` = "com.whatsapp"
-                        putExtra(Intent.EXTRA_TEXT, summary)
+                ),
+                actions = {
+                    IconButton(
+                        onClick = {
+                            val summary = viewModel.getShareSummary()
+                            val intent = Intent(Intent.ACTION_SEND).apply {
+                                type = "text/plain"
+                                `package` = "com.whatsapp"
+                                putExtra(Intent.EXTRA_TEXT, summary)
+                            }
+                            try {
+                                context.startActivity(intent)
+                            } catch (e: Exception) {
+                                context.startActivity(Intent.createChooser(intent, "Share Stats"))
+                            }
+                        }
+                    ) {
+                        Icon(Icons.Default.Share, contentDescription = "Share Stats", tint = MaterialTheme.colorScheme.primary)
                     }
-                    try {
-                        context.startActivity(intent)
-                    } catch (e: Exception) {
-                        context.startActivity(Intent.createChooser(intent, "Share Stats"))
-                    }
-                },
-                icon = { Icon(Icons.Default.Share, contentDescription = null) },
-                text = { Text("Share Stats") },
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary
+                }
             )
         }
     ) { innerPadding ->
@@ -107,16 +106,16 @@ fun StatsGrid(stats: CallStats?) {
             AppMetricTile(
                 title = "Missed",
                 value = (stats?.missed ?: 0).toString(),
-                icon = Icons.Default.CallMissed,
+                icon = Icons.AutoMirrored.Filled.CallMissed,
                 modifier = Modifier.weight(1f),
-                color = WarningAmber
+                color = com.example.leadhunters.ui.theme.ErrorCoral
             )
             AppMetricTile(
                 title = "Rejected",
                 value = (stats?.rejected ?: 0).toString(),
                 icon = Icons.Default.Block,
                 modifier = Modifier.weight(1f),
-                color = ErrorCoral
+                color = com.example.leadhunters.ui.theme.StatusGray
             )
         }
         

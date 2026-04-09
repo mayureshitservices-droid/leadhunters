@@ -14,14 +14,15 @@ import androidx.compose.ui.unit.dp
 fun AppCard(
     modifier: Modifier = Modifier,
     containerColor: Color = MaterialTheme.colorScheme.surface,
-    elevation: androidx.compose.ui.unit.Dp = 1.dp,
+    elevation: androidx.compose.ui.unit.Dp = 0.dp, // Default to flat for clean look
     content: @Composable ColumnScope.() -> Unit
 ) {
     Card(
         modifier = modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.large,
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp), // More premium rounding
         colors = CardDefaults.cardColors(containerColor = containerColor),
         elevation = CardDefaults.cardElevation(defaultElevation = elevation),
+        border = if (elevation == 0.dp) androidx.compose.foundation.BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant) else null,
         content = content
     )
 }
@@ -34,17 +35,16 @@ fun AppBadge(
     contentColor: Color
 ) {
     Surface(
-        color = backgroundColor.copy(alpha = 0.12f),
-        shape = MaterialTheme.shapes.small,
-        border = androidx.compose.foundation.BorderStroke(1.dp, backgroundColor.copy(alpha = 0.3f))
+        color = backgroundColor.copy(alpha = 0.15f),
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             if (icon != null) {
-                Icon(icon, contentDescription = null, modifier = Modifier.size(12.dp), tint = contentColor)
+                Icon(icon, contentDescription = null, modifier = Modifier.size(14.dp), tint = contentColor)
             }
             Text(
                 text = text.uppercase(),
@@ -91,36 +91,37 @@ fun AppMetricTile(
     color: Color,
     modifier: Modifier = Modifier
 ) {
-    AppCard(
+    Surface(
         modifier = modifier.height(110.dp),
-        containerColor = color.copy(alpha = 0.1f)
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp),
+        color = color.copy(alpha = 0.08f),
+        border = androidx.compose.foundation.BorderStroke(1.dp, color.copy(alpha = 0.12f))
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.SpaceBetween
+                .padding(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp), tint = color)
-                Box(modifier = Modifier.size(8.dp).padding(4.dp)) // Placeholder/Alignment
-            }
-            Column {
-                Text(
-                    text = value,
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                modifier = Modifier.size(22.dp),
+                tint = color
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = value,
+                style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = title,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                fontWeight = FontWeight.Medium
+            )
         }
     }
 }

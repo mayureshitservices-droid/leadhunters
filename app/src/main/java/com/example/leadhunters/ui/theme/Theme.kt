@@ -11,34 +11,34 @@ import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
 private val DarkColorScheme = darkColorScheme(
-    primary = PrimaryBlue,
+    primary = PrimaryRed,
     onPrimary = SurfaceLight,
     primaryContainer = SurfaceDark,
     onPrimaryContainer = SurfaceLight,
-    secondary = SecondaryBlue,
+    secondary = DarkRed,
     onSecondary = SurfaceLight,
     background = DarkBackground,
     onBackground = SurfaceLight,
     surface = SurfaceDark,
     onSurface = SurfaceLight,
-    surfaceVariant = DarkDeepBlue,
+    surfaceVariant = Color(0xFF2C2C2C),
     onSurfaceVariant = OnSurfaceVariantDark,
     outline = OutlineDark,
     error = ErrorCoral
 )
 
 private val LightColorScheme = lightColorScheme(
-    primary = PrimaryBlue,
+    primary = PrimaryRed,
     onPrimary = SurfaceLight,
-    primaryContainer = Color(0xFFD1E4FF),
-    onPrimaryContainer = PrimaryBlue,
-    secondary = SecondaryBlue,
+    primaryContainer = SoftRed,
+    onPrimaryContainer = DarkRed,
+    secondary = DarkRed,
     onSecondary = SurfaceLight,
     background = LightBackground,
-    onBackground = DarkDeepBlue,
+    onBackground = OnSurfacePrimaryLight,
     surface = SurfaceLight,
-    onSurface = DarkDeepBlue,
-    surfaceVariant = Color(0xFFF1F4F9),
+    onSurface = OnSurfacePrimaryLight,
+    surfaceVariant = Color(0xFFF9FAFB),
     onSurfaceVariant = OnSurfaceVariantLight,
     outline = OutlineLight,
     error = ErrorCoral
@@ -56,7 +56,9 @@ fun LeadHuntersTheme(
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as Activity).window
+            @Suppress("DEPRECATION")
             window.statusBarColor = colorScheme.background.toArgb()
+            @Suppress("DEPRECATION")
             window.navigationBarColor = colorScheme.background.toArgb()
             WindowCompat.getInsetsController(window, view).apply {
                 isAppearanceLightStatusBars = !darkTheme

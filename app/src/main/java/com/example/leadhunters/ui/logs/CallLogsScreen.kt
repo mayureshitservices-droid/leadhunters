@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Backspace
 import androidx.compose.material.icons.automirrored.filled.CallMade
 import androidx.compose.material.icons.automirrored.filled.CallMissed
 import androidx.compose.material.icons.automirrored.filled.HelpOutline
@@ -30,7 +31,7 @@ import com.example.leadhunters.service.CallService
 import com.example.leadhunters.ui.components.AppBadge
 import com.example.leadhunters.ui.components.AppCard
 import com.example.leadhunters.ui.theme.SuccessEmerald
-import com.example.leadhunters.ui.theme.WarningAmber
+import com.example.leadhunters.ui.theme.WarningStatus
 import com.example.leadhunters.ui.theme.ErrorCoral
 import kotlinx.coroutines.launch
 import java.io.File
@@ -101,20 +102,28 @@ fun CallLogsScreen(
                 onDismissRequest = { showDialer = false },
                 properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
             ) {
-                Surface(
-                    modifier = Modifier.fillMaxWidth().padding(16.dp),
-                    shape = MaterialTheme.shapes.extraLarge,
-                    color = MaterialTheme.colorScheme.surface,
-                    tonalElevation = 8.dp
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.BottomCenter
                 ) {
-                    DialerOverlayContent(
-                        onCallInitiated = { number ->
-                            scope.launch {
-                                viewModel.startCall(number)
-                                showDialer = false
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp)
+                            .padding(bottom = 16.dp), // Lift it slightly from the very bottom
+                        shape = MaterialTheme.shapes.extraLarge,
+                        color = MaterialTheme.colorScheme.surface,
+                        tonalElevation = 8.dp
+                    ) {
+                        DialerOverlayContent(
+                            onCallInitiated = { number ->
+                                scope.launch {
+                                    viewModel.startCall(number)
+                                    showDialer = false
+                                }
                             }
-                        }
-                    )
+                        )
+                    }
                 }
             }
         }
@@ -206,17 +215,28 @@ fun DialPadGrid(onNumberClick: (String) -> Unit, onBackspaceClick: () -> Unit) {
         listOf("*", "0", "#")
     )
 
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         keys.forEach { row ->
-            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
                 row.forEach { key ->
                     DialButton(key) { onNumberClick(key) }
                 }
             }
         }
-        Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth().padding(end = 6.dp)) {
-            IconButton(onClick = onBackspaceClick, modifier = Modifier.size(56.dp)) {
-                Icon(Icons.Default.Backspace, contentDescription = "Backspace", tint = MaterialTheme.colorScheme.primary)
+        Row(
+            horizontalArrangement = Arrangement.End,
+            modifier = Modifier.fillMaxWidth().padding(end = 24.dp)
+        ) {
+            IconButton(onClick = onBackspaceClick, modifier = Modifier.size(64.dp)) {
+                Icon(
+                    Icons.AutoMirrored.Filled.Backspace,
+                    contentDescription = "Backspace",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(28.dp)
+                )
             }
         }
     }
@@ -226,14 +246,17 @@ fun DialPadGrid(onNumberClick: (String) -> Unit, onBackspaceClick: () -> Unit) {
 fun DialButton(text: String, onClick: () -> Unit) {
     Surface(
         modifier = Modifier
-            .size(56.dp)
-            .clip(androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
+            .size(72.dp)
+            .clip(CircleShape) // Circular buttons feel more premium for dialers
             .clickable { onClick() },
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-        shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp)
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+        shape = CircleShape
     ) {
         Box(contentAlignment = Alignment.Center) {
-            Text(text = text, style = MaterialTheme.typography.headlineMedium)
+            Text(
+                text = text,
+                style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.SemiBold)
+            )
         }
     }
 }

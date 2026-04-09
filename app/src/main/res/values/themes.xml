@@ -3,8 +3,8 @@
     <style name="Theme.LeadHunters" parent="android:Theme.Material.Light.NoActionBar" />
 
     <style name="Theme.App.Starting" parent="Theme.SplashScreen">
-        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_splash_logo</item>
-        <item name="windowSplashScreenBackground">#001C3D</item> <!-- Midnight Blue -->
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+        <item name="windowSplashScreenBackground">#E53935</item> <!-- Brand Red -->
         <item name="postSplashScreenTheme">@style/Theme.LeadHunters</item>
     </style>
 </resources>

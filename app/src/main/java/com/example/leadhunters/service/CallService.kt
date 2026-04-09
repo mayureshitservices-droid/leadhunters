@@ -80,12 +80,13 @@ class CallService : Service() {
                 telephonyManager.registerTelephonyCallback(mainExecutor, telephonyCallback)
                 callback = telephonyCallback
             } else {
-                val listener = object : PhoneStateListener() {
+                val listener = @Suppress("DEPRECATION") object : PhoneStateListener() {
                     @Deprecated("Deprecated in Java")
                     override fun onCallStateChanged(state: Int, phoneNumber: String?) {
                         handleCallStateChange(state, targetNumber)
                     }
                 }
+                @Suppress("DEPRECATION")
                 telephonyManager.listen(listener, PhoneStateListener.LISTEN_CALL_STATE)
                 callback = listener
             }
@@ -109,6 +110,7 @@ class CallService : Service() {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && it is TelephonyCallback) {
                 telephonyManager.unregisterTelephonyCallback(it)
             } else if (it is PhoneStateListener) {
+                @Suppress("DEPRECATION")
                 telephonyManager.listen(it, PhoneStateListener.LISTEN_NONE)
             }
         }
