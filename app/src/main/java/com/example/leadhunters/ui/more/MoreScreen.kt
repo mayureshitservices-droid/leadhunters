@@ -13,6 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.example.leadhunters.ui.components.AppCard
+import com.example.leadhunters.ui.theme.PrimaryRed
 
 @Composable
 fun MoreScreen(navController: NavController) {
@@ -25,7 +26,7 @@ fun MoreScreen(navController: NavController) {
             text = "Settings",
             style = MaterialTheme.typography.headlineLarge,
             modifier = Modifier.padding(top = 16.dp, bottom = 24.dp),
-            color = MaterialTheme.colorScheme.onBackground
+            color = PrimaryRed
         )
 
         LazyColumn(

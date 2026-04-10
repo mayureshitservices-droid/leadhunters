@@ -46,18 +46,23 @@ class CallService : Service() {
             ACTION_START_TRACKING -> {
                 val phoneNumber = intent.getStringExtra(EXTRA_PHONE_NUMBER) ?: ""
                 try {
+                    val notification = createNotification("Tracking call to $phoneNumber")
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                        startForeground(
-                            NOTIFICATION_ID, 
-                            createNotification("Tracking call to $phoneNumber"), 
-                            android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_PHONE_CALL
-                        )
+                        try {
+                            startForeground(
+                                NOTIFICATION_ID, 
+                                notification, 
+                                android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_PHONE_CALL
+                            )
+                        } catch (e: Exception) {
+                            Log.w("CallService", "Failed to start with phoneCall type, falling back to default: ${e.message}")
+                            startForeground(NOTIFICATION_ID, notification)
+                        }
                     } else {
-                        startForeground(NOTIFICATION_ID, createNotification("Tracking call to $phoneNumber"))
+                        startForeground(NOTIFICATION_ID, notification)
                     }
                 } catch (e: Exception) {
-                    Log.e("CallService", "Error starting foreground service: ${e.message}")
-                    startForeground(NOTIFICATION_ID, createNotification("Tracking call to $phoneNumber"))
+                    Log.e("CallService", "Fatal error starting foreground service", e)
                 }
                 registerTracking(phoneNumber)
             }

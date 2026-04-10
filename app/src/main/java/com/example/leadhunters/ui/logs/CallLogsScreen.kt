@@ -29,6 +29,7 @@ import com.example.leadhunters.data.local.entities.AppCallLog
 import com.example.leadhunters.service.CallService
 import com.example.leadhunters.ui.components.AppBadge
 import com.example.leadhunters.ui.components.AppCard
+import com.example.leadhunters.ui.theme.PrimaryRed
 import com.example.leadhunters.ui.theme.SuccessEmerald
 import com.example.leadhunters.ui.theme.WarningStatus
 import com.example.leadhunters.ui.theme.ErrorCoral
@@ -74,7 +75,7 @@ fun CallLogsScreen(
                 text = "History",
                 style = MaterialTheme.typography.headlineLarge,
                 modifier = Modifier.padding(16.dp),
-                color = MaterialTheme.colorScheme.onBackground
+                color = PrimaryRed
             )
 
             OutlinedTextField(
@@ -374,14 +375,6 @@ fun EnhancedCallLogItem(
                         modifier = Modifier.size(18.dp)
                     )
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = when {
-                            !hasRecording -> "NO REC"
-                            isCurrentlyPlaying -> "STOP"
-                            else -> "PLAY"
-                        }, 
-                        style = MaterialTheme.typography.labelLarge
-                    )
                 }
 
                 Button(
@@ -391,8 +384,7 @@ fun EnhancedCallLogItem(
                     contentPadding = PaddingValues(0.dp)
                 ) {
                     Icon(Icons.Default.Assignment, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Outcome", style = MaterialTheme.typography.labelLarge)
+                    // Text("Outcome", style = MaterialTheme.typography.labelLarge)
                 }
 
                 Button(
@@ -402,8 +394,7 @@ fun EnhancedCallLogItem(
                     contentPadding = PaddingValues(0.dp)
                 ) {
                     Icon(Icons.Default.Chat, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("WhatsApp", style = MaterialTheme.typography.labelLarge)
+                    // Text("WhatsApp", style = MaterialTheme.typography.labelLarge)
                 }
             }
 

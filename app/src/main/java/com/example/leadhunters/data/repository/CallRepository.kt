@@ -14,6 +14,7 @@ interface CallRepository {
     suspend fun getLogById(id: Long): AppCallLog?
     suspend fun updateLog(callLog: AppCallLog)
     suspend fun getLatestUnreconciled(number: String): AppCallLog?
+    suspend fun getUnreconciledLogsForNumber(number: String): List<AppCallLog>
     suspend fun insertOutcome(outcome: com.example.leadhunters.data.local.entities.CallOutcome): Long
     
     // Reminders

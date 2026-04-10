@@ -36,7 +36,13 @@ class RecordingScanner @Inject constructor(
     }
 
     private fun findByRawPaths(phoneNumber: String, callStartTime: Long): String? {
-        val root = android.os.Environment.getExternalStorageDirectory()
+        val rootPath = try {
+            // Priority 1: Official System property for root
+            System.getenv("EXTERNAL_STORAGE") ?: "/storage/emulated/0"
+        } catch (e: Exception) {
+            "/storage/emulated/0"
+        }
+        val root = File(rootPath)
         val normalizedNumber = phoneNumber.replace(Regex("[^0-9]"), "")
         
         for (path in oemPaths) {

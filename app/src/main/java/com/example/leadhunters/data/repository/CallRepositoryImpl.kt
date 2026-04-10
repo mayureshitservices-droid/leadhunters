@@ -53,6 +53,10 @@ class CallRepositoryImpl @Inject constructor(
         return teleCallerDao.getLatestUnreconciledLogForNumber(number)
     }
 
+    override suspend fun getUnreconciledLogsForNumber(number: String): List<AppCallLog> {
+        return teleCallerDao.getAllUnreconciledLogsForNumber(number)
+    }
+
     override suspend fun insertOutcome(outcome: com.example.leadhunters.data.local.entities.CallOutcome): Long {
         return teleCallerDao.insertOutcome(outcome)
     }
