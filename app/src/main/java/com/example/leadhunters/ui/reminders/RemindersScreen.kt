@@ -1,5 +1,8 @@
 package com.example.leadhunters.ui.reminders
 
+import android.content.Intent
+import android.net.Uri
+import android.widget.Toast
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -10,6 +13,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -61,6 +65,8 @@ fun RemindersScreen(
 
 @Composable
 fun ReminderItem(reminder: Reminder, format: SimpleDateFormat) {
+    val context = LocalContext.current
+    
     AppCard {
         Row(
             modifier = Modifier.fillMaxWidth().padding(16.dp),
@@ -79,7 +85,21 @@ fun ReminderItem(reminder: Reminder, format: SimpleDateFormat) {
             }
             
             IconButton(
-                onClick = { /* Call Action */ },
+                onClick = {
+                    if (reminder.phoneNumber.isNotBlank()) {
+                        try {
+                            val intent = Intent(Intent.ACTION_DIAL).apply {
+                                data = Uri.parse("tel:${reminder.phoneNumber}")
+                                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                            }
+                            context.startActivity(intent)
+                        } catch (e: Exception) {
+                            Toast.makeText(context, "Cannot open dialer: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+                        }
+                    } else {
+                        Toast.makeText(context, "Invalid phone number", Toast.LENGTH_SHORT).show()
+                    }
+                },
                 colors = IconButtonDefaults.iconButtonColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
             ) {
                 Icon(Icons.Default.Phone, contentDescription = "Call", tint = MaterialTheme.colorScheme.onPrimaryContainer)
