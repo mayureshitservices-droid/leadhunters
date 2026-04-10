@@ -4,6 +4,7 @@ import androidx.room.*
 import com.example.leadhunters.data.local.entities.AppCallLog
 import com.example.leadhunters.data.local.entities.CallOutcome
 import com.example.leadhunters.data.local.entities.Lead
+import com.example.leadhunters.data.local.entities.Reminder
 import com.example.leadhunters.data.local.entities.SyncItem
 import com.example.leadhunters.data.local.entities.WhatsAppTemplate
 import kotlinx.coroutines.flow.Flow
@@ -38,10 +39,23 @@ interface TeleCallerDao {
 
     // Outcomes
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertOutcome(outcome: CallOutcome)
+    suspend fun insertOutcome(outcome: CallOutcome): Long
 
     @Query("SELECT * FROM call_outcomes WHERE callLogId = :callLogId")
     suspend fun getOutcomeForCall(callLogId: Long): CallOutcome?
+
+    // Reminders
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertReminder(reminder: Reminder): Long
+
+    @Query("SELECT * FROM reminders ORDER BY reminderTime ASC")
+    fun getAllReminders(): Flow<List<Reminder>>
+
+    @Update
+    suspend fun updateReminder(reminder: Reminder)
+
+    @Delete
+    suspend fun deleteReminder(reminder: Reminder)
 
     // Sync Queue
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -67,7 +81,7 @@ interface TeleCallerDao {
     @Query("""
         SELECT 
             COUNT(*) as totalCalls,
-            SUM(CASE WHEN status = 'CONNECTED' THEN 1 ELSE 0 END) as answered,
+            SUM(CASE WHEN status = 'ANSWERED' THEN 1 ELSE 0 END) as answered,
             SUM(CASE WHEN status = 'MISSED' THEN 1 ELSE 0 END) as missed,
             SUM(CASE WHEN status = 'REJECTED' THEN 1 ELSE 0 END) as rejected,
             SUM(duration) as totalDuration
@@ -79,7 +93,7 @@ interface TeleCallerDao {
     @Query("""
         SELECT 
             COUNT(*) as totalCalls,
-            SUM(CASE WHEN status = 'CONNECTED' THEN 1 ELSE 0 END) as answered,
+            SUM(CASE WHEN status = 'ANSWERED' THEN 1 ELSE 0 END) as answered,
             SUM(CASE WHEN status = 'MISSED' THEN 1 ELSE 0 END) as missed,
             SUM(CASE WHEN status = 'REJECTED' THEN 1 ELSE 0 END) as rejected,
             SUM(duration) as totalDuration

@@ -23,7 +23,7 @@ object DatabaseModule {
             AppDatabase::class.java,
             "lead_hunters_db"
         )
-        .fallbackToDestructiveMigration(false)
+        .fallbackToDestructiveMigration(true)
         .build()
     }
 

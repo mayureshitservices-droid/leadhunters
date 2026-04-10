@@ -10,8 +10,11 @@ import javax.inject.Inject
 
 @HiltViewModel
 class CallLogsViewModel @Inject constructor(
-    private val repository: CallRepository
+    private val repository: CallRepository,
+    val playbackManager: CallPlaybackManager
 ) : ViewModel() {
+
+    val playbackState: StateFlow<PlaybackState> = playbackManager.state
 
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()

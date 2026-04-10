@@ -8,8 +8,9 @@ data class CallOutcome(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val callLogId: Long,
     val leadId: String,
-    val outcomeType: String, // Interested, Not Interested, Callback, etc.
-    val notes: String? = null,
+    val customerName: String,
+    val outcomeType: String, // Interested, Ordered, Booked, Remind later, Lost
+    val remarks: String? = null,
     val nextReminderTime: Long? = null,
     val timestamp: Long = System.currentTimeMillis()
 )

@@ -6,12 +6,13 @@ import com.example.leadhunters.data.local.dao.TeleCallerDao
 import com.example.leadhunters.data.local.entities.AppCallLog
 import com.example.leadhunters.data.local.entities.CallOutcome
 import com.example.leadhunters.data.local.entities.Lead
+import com.example.leadhunters.data.local.entities.Reminder
 import com.example.leadhunters.data.local.entities.SyncItem
 import com.example.leadhunters.data.local.entities.WhatsAppTemplate
 
 @Database(
-    entities = [Lead::class, AppCallLog::class, CallOutcome::class, SyncItem::class, WhatsAppTemplate::class],
-    version = 2,
+    entities = [Lead::class, AppCallLog::class, CallOutcome::class, SyncItem::class, WhatsAppTemplate::class, Reminder::class],
+    version = 3,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {

@@ -12,6 +12,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
+import android.os.Build
 
 @Composable
 fun GlobalPermissionHandler(content: @Composable () -> Unit) {
@@ -19,7 +20,12 @@ fun GlobalPermissionHandler(content: @Composable () -> Unit) {
     val permissionsToRequest = arrayOf(
         Manifest.permission.CALL_PHONE,
         Manifest.permission.READ_CALL_LOG,
-        Manifest.permission.READ_PHONE_STATE
+        Manifest.permission.READ_PHONE_STATE,
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            Manifest.permission.READ_MEDIA_AUDIO
+        } else {
+            Manifest.permission.READ_EXTERNAL_STORAGE
+        }
     )
 
     var permissionsGranted by remember {
@@ -52,7 +58,7 @@ fun GlobalPermissionHandler(content: @Composable () -> Unit) {
         AlertDialog(
             onDismissRequest = { },
             title = { Text("Permissions Required") },
-            text = { Text("LeadHunters needs Call, Phone State, and Log permissions to securely track your business outcomes. The app cannot track analytics without them.") },
+            text = { Text("LeadHunters needs Call, Phone State, and Audio/External Storage permissions to securely track your business outcomes and play back call recordings. The app cannot track analytics without them.") },
             confirmButton = {
                 Button(onClick = {
                     val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {

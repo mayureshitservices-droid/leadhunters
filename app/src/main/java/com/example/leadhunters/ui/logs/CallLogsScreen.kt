@@ -1,7 +1,6 @@
 package com.example.leadhunters.ui.logs
 
 import android.content.Intent
-import android.media.MediaPlayer
 import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
@@ -41,13 +40,22 @@ import java.util.*
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CallLogsScreen(
+    onOutcomeClick: (Long) -> Unit,
+    onWhatsAppClick: (String) -> Unit,
     viewModel: CallLogsViewModel = hiltViewModel()
 ) {
     val logs by viewModel.callLogs.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
+    val playbackState by viewModel.playbackState.collectAsState()
     val sheetState = rememberModalBottomSheetState()
     val scope = rememberCoroutineScope()
     var showDialer by remember { mutableStateOf(false) }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            viewModel.playbackManager.stop()
+        }
+    }
 
     Scaffold(
         floatingActionButton = {
@@ -80,9 +88,10 @@ fun CallLogsScreen(
                 shape = MaterialTheme.shapes.extraLarge,
                 singleLine = true,
                 colors = OutlinedTextFieldDefaults.colors(
-                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                    focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
-                    unfocusedBorderColor = Color.Transparent
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                    focusedContainerColor = MaterialTheme.colorScheme.surface,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
+                    focusedBorderColor = MaterialTheme.colorScheme.primary
                 )
             )
 
@@ -92,7 +101,13 @@ fun CallLogsScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 items(logs) { log ->
-                    EnhancedCallLogItem(log = log)
+                    EnhancedCallLogItem(
+                        log = log,
+                        playbackState = playbackState,
+                        onPlaybackToggle = { id, path -> viewModel.playbackManager.togglePlayback(id, path) },
+                        onOutcomeClick = { onOutcomeClick(log.id) },
+                        onWhatsAppClick = { onWhatsAppClick(log.phoneNumber) }
+                    )
                 }
             }
         }
@@ -113,7 +128,7 @@ fun CallLogsScreen(
                             .padding(bottom = 16.dp), // Lift it slightly from the very bottom
                         shape = MaterialTheme.shapes.extraLarge,
                         color = MaterialTheme.colorScheme.surface,
-                        tonalElevation = 8.dp
+                        tonalElevation = 0.dp
                     ) {
                         DialerOverlayContent(
                             onCallInitiated = { number ->
@@ -249,8 +264,9 @@ fun DialButton(text: String, onClick: () -> Unit) {
             .size(72.dp)
             .clip(CircleShape) // Circular buttons feel more premium for dialers
             .clickable { onClick() },
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-        shape = CircleShape
+        color = Color.White, // Strictly neutral white to avoid theme tints
+        shape = CircleShape,
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color.LightGray.copy(alpha = 0.2f))
     ) {
         Box(contentAlignment = Alignment.Center) {
             Text(
@@ -262,19 +278,17 @@ fun DialButton(text: String, onClick: () -> Unit) {
 }
 
 @Composable
-fun EnhancedCallLogItem(log: AppCallLog) {
-    val context = LocalContext.current
+fun EnhancedCallLogItem(
+    log: AppCallLog,
+    playbackState: PlaybackState,
+    onPlaybackToggle: (Long, String) -> Unit,
+    onOutcomeClick: () -> Unit,
+    onWhatsAppClick: () -> Unit
+) {
     val dateFormat = remember { SimpleDateFormat("dd MMM, hh:mm a", Locale.getDefault()) }
-    var isPlaying by remember { mutableStateOf(false) }
-    var mediaPlayer by remember { mutableStateOf<MediaPlayer?>(null) }
+    val isCurrentlyPlaying = playbackState.currentLogId == log.id && playbackState.isPlaying
+    val hasRecording = !log.recordingPath.isNullOrEmpty() && File(log.recordingPath).exists()
     
-    DisposableEffect(log.id) {
-        onDispose {
-            mediaPlayer?.release()
-            mediaPlayer = null
-        }
-    }
-
     AppCard(elevation = 1.dp) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
@@ -299,55 +313,145 @@ fun EnhancedCallLogItem(log: AppCallLog) {
             
             HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp), thickness = 0.5.dp, color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
             
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Schedule, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(text = formatDuration(log.duration?.toLong() ?: 0L), style = MaterialTheme.typography.bodyMedium)
+                
+                if (hasRecording) {
+                    Spacer(modifier = Modifier.weight(1f))
+                    Icon(
+                        Icons.Default.Mic, 
+                        contentDescription = "Recorded", 
+                        modifier = Modifier.size(14.dp), 
+                        tint = MaterialTheme.colorScheme.secondary.copy(alpha = 0.6f)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        "Recorded", 
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.6f)
+                    )
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Action Buttons
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Schedule, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(text = formatDuration(log.duration?.toLong() ?: 0L), style = MaterialTheme.typography.bodyMedium)
-                }
-                
-                if (log.recordingPath != null && File(log.recordingPath).exists()) {
-                    IconButton(
-                        onClick = {
-                            if (isPlaying) {
-                                mediaPlayer?.pause()
-                                isPlaying = false
-                            } else {
-                                if (mediaPlayer == null) {
-                                    mediaPlayer = MediaPlayer.create(context, Uri.fromFile(File(log.recordingPath))).apply {
-                                        setOnCompletionListener { isPlaying = false }
-                                    }
-                                }
-                                mediaPlayer?.start()
-                                isPlaying = true
-                            }
+                Button(
+                    onClick = { 
+                        if (hasRecording) {
+                            onPlaybackToggle(log.id, log.recordingPath!!)
+                        }
+                    },
+                    modifier = Modifier.weight(1f),
+                    enabled = hasRecording,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = when {
+                            !hasRecording -> MaterialTheme.colorScheme.surfaceVariant
+                            isCurrentlyPlaying -> MaterialTheme.colorScheme.errorContainer
+                            else -> MaterialTheme.colorScheme.tertiaryContainer
                         },
-                        colors = IconButtonDefaults.iconButtonColors(
-                            containerColor = if (isPlaying) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
-                        )
-                    ) {
-                        Icon(if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow, contentDescription = null)
-                    }
+                        contentColor = when {
+                            !hasRecording -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+                            isCurrentlyPlaying -> MaterialTheme.colorScheme.onErrorContainer
+                            else -> MaterialTheme.colorScheme.onTertiaryContainer
+                        }
+                    ),
+                    contentPadding = PaddingValues(0.dp)
+                ) {
+                    Icon(
+                        imageVector = when {
+                            !hasRecording -> Icons.Default.Block
+                            isCurrentlyPlaying -> Icons.Default.Pause
+                            else -> Icons.Default.PlayArrow
+                        },
+                        contentDescription = null, 
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = when {
+                            !hasRecording -> "NO REC"
+                            isCurrentlyPlaying -> "STOP"
+                            else -> "PLAY"
+                        }, 
+                        style = MaterialTheme.typography.labelLarge
+                    )
+                }
+
+                Button(
+                    onClick = onOutcomeClick,
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primaryContainer, contentColor = MaterialTheme.colorScheme.onPrimaryContainer),
+                    contentPadding = PaddingValues(0.dp)
+                ) {
+                    Icon(Icons.Default.Assignment, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Outcome", style = MaterialTheme.typography.labelLarge)
+                }
+
+                Button(
+                    onClick = onWhatsAppClick,
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondaryContainer, contentColor = MaterialTheme.colorScheme.onSecondaryContainer),
+                    contentPadding = PaddingValues(0.dp)
+                ) {
+                    Icon(Icons.Default.Chat, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("WhatsApp", style = MaterialTheme.typography.labelLarge)
                 }
             }
 
-            AnimatedVisibility(visible = isPlaying) {
-                Box(modifier = Modifier.fillMaxWidth().padding(top = 12.dp)) {
-                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth().height(2.dp), color = MaterialTheme.colorScheme.primary)
+            AnimatedVisibility(visible = isCurrentlyPlaying) {
+                Column(modifier = Modifier.fillMaxWidth().padding(top = 12.dp)) {
+                    val progress = if (playbackState.duration > 0) {
+                        playbackState.currentPosition.toFloat() / playbackState.duration
+                    } else 0f
+                    
+                    LinearProgressIndicator(
+                        progress = { progress },
+                        modifier = Modifier.fillMaxWidth().height(4.dp).clip(CircleShape),
+                        color = MaterialTheme.colorScheme.primary,
+                        trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+                    )
+                    
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = formatDurationMs(playbackState.currentPosition),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Text(
+                            text = formatDurationMs(playbackState.duration),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             }
         }
     }
 }
 
+fun formatDurationMs(ms: Int): String {
+    val totalSeconds = ms / 1000
+    val minutes = totalSeconds / 60
+    val seconds = totalSeconds % 60
+    return String.format("%02d:%02d", minutes, seconds)
+}
+
 @Composable
 fun CallStatusBadge(status: String) {
     val (label, color, icon) = when (status.uppercase()) {
-        "ANSWERED", "CONNECTED" -> Triple("Answered", com.example.leadhunters.ui.theme.SuccessEmerald, Icons.AutoMirrored.Filled.CallMade)
+        "ANSWERED" -> Triple("Answered", com.example.leadhunters.ui.theme.SuccessEmerald, Icons.AutoMirrored.Filled.CallMade)
         "MISSED" -> Triple("Missed", com.example.leadhunters.ui.theme.ErrorCoral, Icons.AutoMirrored.Filled.CallMissed)
         "REJECTED", "UNANSWERED" -> Triple("Rejected", androidx.compose.ui.graphics.Color.Gray, Icons.Default.Block)
         else -> Triple(status, androidx.compose.ui.graphics.Color.Gray, Icons.AutoMirrored.Filled.HelpOutline)

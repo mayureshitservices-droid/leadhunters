@@ -95,7 +95,20 @@ fun MainScreen() {
                 DashboardScreen()
             }
             composable(AppDestinations.LOGS.route) {
-                CallLogsScreen()
+                CallLogsScreen(
+                    onOutcomeClick = { callId -> navController.navigate("outcome/$callId") },
+                    onWhatsAppClick = { number -> navController.navigate("send_template/$number") } 
+                )
+            }
+            composable(
+                route = "send_template/{phoneNumber}",
+                arguments = listOf(navArgument("phoneNumber") { type = NavType.StringType; nullable = true })
+            ) { backStackEntry ->
+                val phoneNumber = backStackEntry.arguments?.getString("phoneNumber")
+                WhatsAppSendFlow(
+                    phoneNumber = phoneNumber,
+                    onBack = { navController.popBackStack() }
+                )
             }
             composable(AppDestinations.REMINDERS.route) {
                 RemindersScreen()

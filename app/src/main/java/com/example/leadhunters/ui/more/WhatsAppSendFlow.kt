@@ -24,6 +24,7 @@ import com.example.leadhunters.ui.logs.CallLogsViewModel
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WhatsAppSendFlow(
+    phoneNumber: String? = null,
     onBack: () -> Unit,
     templateViewModel: TemplateViewModel = hiltViewModel(),
     logsViewModel: CallLogsViewModel = hiltViewModel()
@@ -58,7 +59,14 @@ fun WhatsAppSendFlow(
             ) {
                 items(templates) { template ->
                     AppCard(
-                        modifier = Modifier.clickable { selectedTemplate = template },
+                        modifier = Modifier.clickable { 
+                            if (phoneNumber != null) {
+                                sendWhatsApp(context, phoneNumber, template.message)
+                                onBack()
+                            } else {
+                                selectedTemplate = template 
+                            }
+                        },
                         elevation = 1.dp
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {

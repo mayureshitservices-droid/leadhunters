@@ -94,8 +94,8 @@ fun AppMetricTile(
     Surface(
         modifier = modifier.height(110.dp),
         shape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp),
-        color = color.copy(alpha = 0.08f),
-        border = androidx.compose.foundation.BorderStroke(1.dp, color.copy(alpha = 0.12f))
+        color = MaterialTheme.colorScheme.surface, // Neutral background
+        border = androidx.compose.foundation.BorderStroke(1.dp, color.copy(alpha = 0.15f)) // Subtle colored border
     ) {
         Column(
             modifier = Modifier

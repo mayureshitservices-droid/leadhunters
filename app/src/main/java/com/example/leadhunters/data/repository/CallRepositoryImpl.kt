@@ -3,6 +3,7 @@ package com.example.leadhunters.data.repository
 import com.example.leadhunters.data.local.dao.TeleCallerDao
 import com.example.leadhunters.data.local.entities.AppCallLog
 import com.example.leadhunters.data.local.entities.Lead
+import com.example.leadhunters.data.local.entities.Reminder
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 
@@ -52,7 +53,13 @@ class CallRepositoryImpl @Inject constructor(
         return teleCallerDao.getLatestUnreconciledLogForNumber(number)
     }
 
-    override suspend fun insertOutcome(outcome: com.example.leadhunters.data.local.entities.CallOutcome) {
-        teleCallerDao.insertOutcome(outcome)
+    override suspend fun insertOutcome(outcome: com.example.leadhunters.data.local.entities.CallOutcome): Long {
+        return teleCallerDao.insertOutcome(outcome)
+    }
+
+    override fun getReminders(): Flow<List<Reminder>> = teleCallerDao.getAllReminders()
+
+    override suspend fun insertReminder(reminder: Reminder): Long {
+        return teleCallerDao.insertReminder(reminder)
     }
 }
