@@ -28,6 +28,7 @@ import com.example.leadhunters.ui.more.MoreScreen
 import com.example.leadhunters.ui.more.TemplateManagementScreen
 import com.example.leadhunters.ui.more.WhatsAppSendFlow
 import com.example.leadhunters.ui.outcome.OutcomeFormScreen
+import com.example.leadhunters.ui.init.InitScreen
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
@@ -56,7 +57,9 @@ fun MainScreen() {
 
     Scaffold(
         bottomBar = {
-            if (currentDestination != null && !currentDestination.startsWith("outcome/")) {
+            if (currentDestination != null && 
+                !currentDestination.startsWith("outcome/") && 
+                currentDestination != "initialization") {
                 NavigationBar(
                     containerColor = MaterialTheme.colorScheme.background,
                     tonalElevation = 8.dp
@@ -88,9 +91,18 @@ fun MainScreen() {
     ) { innerPadding ->
         NavHost(
             navController = navController,
-            startDestination = AppDestinations.DASHBOARD.route,
+            startDestination = "initialization",
             modifier = Modifier.padding(innerPadding)
         ) {
+            composable("initialization") {
+                InitScreen(
+                    onSuccess = {
+                        navController.navigate(AppDestinations.DASHBOARD.route) {
+                            popUpTo("initialization") { inclusive = true }
+                        }
+                    }
+                )
+            }
             composable(AppDestinations.DASHBOARD.route) {
                 DashboardScreen()
             }

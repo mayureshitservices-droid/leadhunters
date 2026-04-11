@@ -1,8 +1,11 @@
 package com.example.leadhunters.di
 
 import com.example.leadhunters.data.local.dao.TeleCallerDao
+import com.example.leadhunters.data.repository.AuthRepository
+import com.example.leadhunters.data.repository.AuthRepositoryImpl
 import com.example.leadhunters.data.repository.CallRepository
 import com.example.leadhunters.data.repository.CallRepositoryImpl
+import dagger.Binds
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -11,11 +14,17 @@ import javax.inject.Singleton
 
 @Module
 @InstallIn(SingletonComponent::class)
-object RepositoryModule {
+abstract class RepositoryModule {
 
-    @Provides
+    @Binds
     @Singleton
-    fun provideCallRepository(teleCallerDao: TeleCallerDao): CallRepository {
-        return CallRepositoryImpl(teleCallerDao)
+    abstract fun bindAuthRepository(impl: AuthRepositoryImpl): AuthRepository
+
+    companion object {
+        @Provides
+        @Singleton
+        fun provideCallRepository(teleCallerDao: TeleCallerDao): CallRepository {
+            return CallRepositoryImpl(teleCallerDao)
+        }
     }
 }
