@@ -63,9 +63,22 @@ class CallPlaybackManager @Inject constructor(
 
         try {
             if (mediaPlayer == null) {
-                mediaPlayer = MediaPlayer.create(context, Uri.fromFile(file)).apply {
+                val newPlayer = MediaPlayer.create(context, Uri.fromFile(file))
+                if (newPlayer == null) {
+                    _state.value = _state.value.copy(error = "Unsupported audio format or file corrupted")
+                    com.example.leadhunters.util.CrashReporter.log("ERROR: MediaPlayer.create returned null for $filePath")
+                    return
+                }
+                
+                mediaPlayer = newPlayer.apply {
                     setOnCompletionListener {
                         stop()
+                    }
+                    setOnErrorListener { _, what, extra ->
+                        com.example.leadhunters.util.CrashReporter.log("ERROR: MediaPlayer error: $what, $extra")
+                        _state.value = _state.value.copy(error = "Playback error occurred")
+                        stop()
+                        true
                     }
                 }
             }
@@ -77,8 +90,11 @@ class CallPlaybackManager @Inject constructor(
                 duration = mediaPlayer?.duration ?: 0
             )
             handler.post(progressUpdater)
+            com.example.leadhunters.util.CrashReporter.log("Playback started for log $logId")
         } catch (e: Exception) {
+            com.example.leadhunters.util.CrashReporter.logError(e, "Error during playback initialization")
             _state.value = _state.value.copy(error = "Could not initialize player: ${e.message}")
+            stop()
         }
     }
 

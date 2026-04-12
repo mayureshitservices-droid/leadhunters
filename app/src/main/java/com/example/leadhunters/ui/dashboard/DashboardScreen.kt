@@ -50,6 +50,8 @@ fun DashboardScreen(
                             try {
                                 context.startActivity(intent)
                             } catch (e: Exception) {
+                                // Clear package constraint so chooser can show all apps
+                                intent.setPackage(null)
                                 context.startActivity(Intent.createChooser(intent, "Share Stats"))
                             }
                         }

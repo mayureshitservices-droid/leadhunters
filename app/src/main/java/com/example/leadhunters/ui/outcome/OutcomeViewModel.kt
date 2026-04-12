@@ -20,6 +20,12 @@ class OutcomeViewModel @Inject constructor(
     val uiState = _uiState.asStateFlow()
 
     fun loadCall(callLogId: Long) {
+        val currentState = _uiState.value
+        if (currentState is OutcomeUiState.Form && currentState.callId == callLogId) {
+            // Already loaded for this call, don't reset
+            return
+        }
+
         viewModelScope.launch {
             val log = repository.getLogById(callLogId)
             if (log != null) {
@@ -27,9 +33,16 @@ class OutcomeViewModel @Inject constructor(
                     callId = log.id,
                     leadId = log.leadId,
                     phoneNumber = log.phoneNumber,
-                    customerName = "" // Start with empty to avoid annoying placeholder text
+                    customerName = ""
                 )
             }
+        }
+    }
+
+    fun clearError() {
+        val state = _uiState.value
+        if (state is OutcomeUiState.Error) {
+            _uiState.value = state.previousFormState
         }
     }
 
@@ -42,44 +55,52 @@ class OutcomeViewModel @Inject constructor(
         remarks: String?,
         reminderTimestamp: Long?
     ) {
+        val currentFormState = _uiState.value as? OutcomeUiState.Form
+
         if (customerName.isBlank()) {
-            // Handle error (could add a generic error state or use validation in UI)
+            _uiState.value = OutcomeUiState.Error("Please enter customer name", currentFormState ?: OutcomeUiState.Idle)
             return
         }
 
         if (type == "Remind later" && reminderTimestamp == null) {
+            _uiState.value = OutcomeUiState.Error("Please select reminder date and time", currentFormState ?: OutcomeUiState.Idle)
             return
         }
 
         if (type != "Remind later" && remarks.isNullOrBlank()) {
+            _uiState.value = OutcomeUiState.Error("Please enter remarks", currentFormState ?: OutcomeUiState.Idle)
             return
         }
 
         viewModelScope.launch {
-            // 1. Save Outcome
-            repository.insertOutcome(
-                CallOutcome(
-                    callLogId = callId,
-                    leadId = leadId,
-                    customerName = customerName,
-                    outcomeType = type,
-                    remarks = remarks,
-                    nextReminderTime = reminderTimestamp
-                )
-            )
-
-            // 2. If it's a reminder, save it to the reminders table too
-            if (type == "Remind later" && reminderTimestamp != null) {
-                repository.insertReminder(
-                    Reminder(
+            try {
+                // 1. Save Outcome
+                repository.insertOutcome(
+                    CallOutcome(
+                        callLogId = callId,
+                        leadId = leadId,
                         customerName = customerName,
-                        phoneNumber = phoneNumber,
-                        reminderTime = reminderTimestamp
+                        outcomeType = type,
+                        remarks = remarks,
+                        nextReminderTime = reminderTimestamp
                     )
                 )
-            }
 
-            _uiState.value = OutcomeUiState.Success
+                // 2. If it's a reminder, save it to the reminders table too
+                if (type == "Remind later" && reminderTimestamp != null) {
+                    repository.insertReminder(
+                        Reminder(
+                            customerName = customerName,
+                            phoneNumber = phoneNumber,
+                            reminderTime = reminderTimestamp
+                        )
+                    )
+                }
+
+                _uiState.value = OutcomeUiState.Success
+            } catch (e: Exception) {
+                _uiState.value = OutcomeUiState.Error("Failed to save outcome: ${e.message}", currentFormState ?: OutcomeUiState.Idle)
+            }
         }
     }
 }
@@ -92,5 +113,6 @@ sealed class OutcomeUiState {
         val phoneNumber: String,
         val customerName: String
     ) : OutcomeUiState()
+    data class Error(val message: String, val previousFormState: OutcomeUiState) : OutcomeUiState()
     object Success : OutcomeUiState()
 }

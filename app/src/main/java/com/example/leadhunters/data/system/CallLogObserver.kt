@@ -14,15 +14,33 @@ class CallLogObserver(
 ) : ContentObserver(null) {
 
     fun register() {
-        context.contentResolver.registerContentObserver(
-            CallLog.Calls.CONTENT_URI,
-            true,
-            this
-        )
+        try {
+            if (androidx.core.content.ContextCompat.checkSelfPermission(
+                    context, 
+                    android.Manifest.permission.READ_CALL_LOG
+                ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+            ) {
+                context.contentResolver.registerContentObserver(
+                    CallLog.Calls.CONTENT_URI,
+                    true,
+                    this
+                )
+            } else {
+                Log.w("CallLogObserver", "Cannot register: READ_CALL_LOG permission not granted")
+            }
+        } catch (e: SecurityException) {
+            Log.e("CallLogObserver", "SecurityException while registering observer", e)
+        } catch (e: Exception) {
+            Log.e("CallLogObserver", "Unexpected error registering observer", e)
+        }
     }
 
     fun unregister() {
-        context.contentResolver.unregisterContentObserver(this)
+        try {
+            context.contentResolver.unregisterContentObserver(this)
+        } catch (e: Exception) {
+            Log.e("CallLogObserver", "Error unregistering observer", e)
+        }
     }
 
     override fun onChange(selfChange: Boolean) {

@@ -13,6 +13,13 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 import android.os.Build
+import android.util.Log
+import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Security
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 
 @Composable
 fun GlobalPermissionHandler(content: @Composable () -> Unit) {
@@ -70,13 +77,53 @@ fun GlobalPermissionHandler(content: @Composable () -> Unit) {
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showExplanationDialog = false }) {
+                TextButton(onClick = { 
+                    // Log to Crashlytics if they skip
+                    Log.w("Permissions", "User skipped mandatory permissions")
+                }) {
                     Text("Skip for now")
                 }
             }
         )
     }
 
-    // Always render the content so the user can see the app, but certain actions will be disabled or fall back.
-    content()
+    if (permissionsGranted) {
+        content()
+    } else {
+        // Show a blocking state if permissions are missing
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = MaterialTheme.colorScheme.background
+        ) {
+            Column(
+                modifier = Modifier.padding(32.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Security,
+                    contentDescription = null,
+                    modifier = Modifier.size(64.dp),
+                    tint = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.height(24.dp))
+                Text(
+                    text = "Permission Required",
+                    style = MaterialTheme.typography.headlineMedium,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = "Please grant the required permissions to continue using LeadHunters.",
+                    style = MaterialTheme.typography.bodyLarge,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(32.dp))
+                Button(onClick = { launcher.launch(permissionsToRequest) }) {
+                    Text("Grant Permissions")
+                }
+            }
+        }
+    }
 }

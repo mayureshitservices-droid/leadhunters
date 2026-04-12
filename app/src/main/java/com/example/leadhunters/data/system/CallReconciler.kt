@@ -16,64 +16,81 @@ class CallReconciler @Inject constructor(
 ) {
 
     suspend fun reconcile(phoneNumber: String) {
-        val pendingLogs = repository.getUnreconciledLogsForNumber(phoneNumber)
-        if (pendingLogs.isEmpty()) return
-        
-        Log.d("CallReconciler", "Attempting reconcile for ${pendingLogs.size} logs for $phoneNumber")
-        
-        for (pendingLog in pendingLogs) {
-            val cursor = context.contentResolver.query(
-                CallLog.Calls.CONTENT_URI,
-                null,
-                "${CallLog.Calls.NUMBER} = ? AND ${CallLog.Calls.DATE} >= ?",
-                arrayOf(phoneNumber, (pendingLog.startTime - 10000).toString()), // 10s buffer
-                "${CallLog.Calls.DATE} DESC"
-            )
-
-            cursor?.use {
-                if (it.moveToFirst()) {
-                    val durationIdx = it.getColumnIndex(CallLog.Calls.DURATION)
-                    val typeIdx = it.getColumnIndex(CallLog.Calls.TYPE)
-                    val dateIdx = it.getColumnIndex(CallLog.Calls.DATE)
-                    val idIdx = it.getColumnIndex(CallLog.Calls._ID)
-
-                    if (durationIdx == -1 || typeIdx == -1 || dateIdx == -1 || idIdx == -1) {
-                        Log.w("CallReconciler", "Missing required CallLog columns")
-                        return@use
-                    }
-
-                    val duration = it.getLong(durationIdx)
-                    val type = it.getInt(typeIdx)
-                    val date = it.getLong(dateIdx)
-                    val systemId = it.getLong(idIdx)
-
-                    val status = when (type) {
-                        CallLog.Calls.OUTGOING_TYPE -> if (duration > 0L) "ANSWERED" else "REJECTED"
-                        CallLog.Calls.INCOMING_TYPE -> if (duration > 0L) "ANSWERED" else "MISSED"
-                        CallLog.Calls.MISSED_TYPE -> "MISSED"
-                        CallLog.Calls.REJECTED_TYPE -> "REJECTED"
-                        else -> "ENDED"
-                    }
-
-                    // Scan for recording
-                    val recordingPath = recordingScanner.findRecordingForCall(phoneNumber, date)
-
-                    repository.finalizeCall(
-                        callLogId = pendingLog.id,
-                        duration = duration,
-                        status = status,
-                        systemCallLogId = systemId
+        try {
+            val pendingLogs = repository.getUnreconciledLogsForNumber(phoneNumber)
+            if (pendingLogs.isEmpty()) return
+            
+            Log.d("CallReconciler", "Attempting reconcile for ${pendingLogs.size} logs for $phoneNumber")
+            
+            for (pendingLog in pendingLogs) {
+                try {
+                    val cursor = context.contentResolver.query(
+                        CallLog.Calls.CONTENT_URI,
+                        null,
+                        "${CallLog.Calls.NUMBER} = ? AND ${CallLog.Calls.DATE} >= ?",
+                        arrayOf(phoneNumber, (pendingLog.startTime - 60000).toString()), // 60s buffer for better safety
+                        "${CallLog.Calls.DATE} DESC"
                     )
-                    
-                    // Update with recording if found
-                    val updatedLog = repository.getLogById(pendingLog.id)
-                    if (updatedLog != null) {
-                        repository.updateLog(updatedLog.copy(recordingPath = recordingPath))
+
+                    cursor?.use {
+                        if (it.moveToFirst()) {
+                            val durationIdx = it.getColumnIndex(CallLog.Calls.DURATION)
+                            val typeIdx = it.getColumnIndex(CallLog.Calls.TYPE)
+                            val dateIdx = it.getColumnIndex(CallLog.Calls.DATE)
+                            val idIdx = it.getColumnIndex(CallLog.Calls._ID)
+
+                            if (durationIdx == -1 || typeIdx == -1 || dateIdx == -1 || idIdx == -1) {
+                                Log.w("CallReconciler", "Missing required CallLog columns")
+                                return@use
+                            }
+
+                            val duration = it.getLong(durationIdx)
+                            val type = it.getInt(typeIdx)
+                            val date = it.getLong(dateIdx)
+                            val systemId = it.getLong(idIdx)
+
+                            val status = when (type) {
+                                CallLog.Calls.OUTGOING_TYPE -> if (duration > 0L) "ANSWERED" else "REJECTED"
+                                CallLog.Calls.INCOMING_TYPE -> if (duration > 0L) "ANSWERED" else "MISSED"
+                                CallLog.Calls.MISSED_TYPE -> "MISSED"
+                                CallLog.Calls.REJECTED_TYPE -> "REJECTED"
+                                else -> "ENDED"
+                            }
+
+                            // Scan for recording
+                            val recordingPath = try {
+                                recordingScanner.findRecordingForCall(phoneNumber, date)
+                            } catch (e: Exception) {
+                                Log.e("CallReconciler", "Error scanning for recording", e)
+                                null
+                            }
+
+                            repository.finalizeCall(
+                                callLogId = pendingLog.id,
+                                duration = duration,
+                                status = status,
+                                systemCallLogId = systemId
+                            )
+                            
+                            // Update with recording if found
+                            if (recordingPath != null) {
+                                val updatedLog = repository.getLogById(pendingLog.id)
+                                if (updatedLog != null) {
+                                    repository.updateLog(updatedLog.copy(recordingPath = recordingPath))
+                                }
+                            }
+                            
+                            Log.d("CallReconciler", "Reconciled log ${pendingLog.id} with system ID $systemId")
+                        }
                     }
-                    
-                    Log.d("CallReconciler", "Reconciled log ${pendingLog.id} with system ID $systemId")
+                } catch (e: SecurityException) {
+                    Log.e("CallReconciler", "Permission denied querying CallLog for $phoneNumber", e)
+                } catch (e: Exception) {
+                    Log.e("CallReconciler", "Unexpected error reconciling log ${pendingLog.id}", e)
                 }
             }
+        } catch (e: Exception) {
+            Log.e("CallReconciler", "Fatal error in reconcile loop for $phoneNumber", e)
         }
     }
 }

@@ -21,6 +21,7 @@ class CallService : Service() {
 
     @Inject lateinit var repository: CallRepository
     @Inject lateinit var reconciler: CallReconciler
+    @Inject lateinit var playbackManager: com.example.leadhunters.ui.logs.CallPlaybackManager
     
     private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var callLogObserver: CallLogObserver? = null
@@ -47,22 +48,39 @@ class CallService : Service() {
                 val phoneNumber = intent.getStringExtra(EXTRA_PHONE_NUMBER) ?: ""
                 try {
                     val notification = createNotification("Tracking call to $phoneNumber")
+                    
+                    // Android 14 (API 34) and higher require specific permission checks before starting foreground service
+                    val hasPhoneCallPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                        androidx.core.content.ContextCompat.checkSelfPermission(
+                            this, "android.permission.FOREGROUND_SERVICE_PHONE_CALL"
+                        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                    } else true
+
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                         try {
-                            startForeground(
-                                NOTIFICATION_ID, 
-                                notification, 
-                                android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_PHONE_CALL
-                            )
+                            if (hasPhoneCallPermission) {
+                                startForeground(
+                                    NOTIFICATION_ID, 
+                                    notification, 
+                                    android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_PHONE_CALL
+                                )
+                            } else {
+                                Log.w("CallService", "Missing FOREGROUND_SERVICE_PHONE_CALL permission, starting with default type")
+                                startForeground(NOTIFICATION_ID, notification)
+                            }
                         } catch (e: Exception) {
                             Log.w("CallService", "Failed to start with phoneCall type, falling back to default: ${e.message}")
-                            startForeground(NOTIFICATION_ID, notification)
+                            try {
+                                startForeground(NOTIFICATION_ID, notification)
+                            } catch (fallbackEx: Exception) {
+                                Log.e("CallService", "Total failure to start foreground service", fallbackEx)
+                            }
                         }
                     } else {
                         startForeground(NOTIFICATION_ID, notification)
                     }
                 } catch (e: Exception) {
-                    Log.e("CallService", "Fatal error starting foreground service", e)
+                    Log.e("CallService", "Fatal error in onStartCommand foreground logic", e)
                 }
                 registerTracking(phoneNumber)
             }
@@ -133,9 +151,11 @@ class CallService : Service() {
             }
             TelephonyManager.CALL_STATE_OFFHOOK -> {
                 Log.d("CallService", "Call OFFHOOK (Active)")
+                playbackManager.stop()
             }
             TelephonyManager.CALL_STATE_RINGING -> {
                 Log.d("CallService", "Call RINGING")
+                playbackManager.stop()
             }
         }
     }

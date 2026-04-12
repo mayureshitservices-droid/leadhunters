@@ -21,6 +21,7 @@ class AuthRepositoryImpl @Inject constructor(
 ) : AuthRepository {
 
     override suspend fun registerDevice(): Result<String> {
+        com.example.leadhunters.util.CrashReporter.log("Starting device registration")
         return try {
             val deviceId = deviceProvider.getDeviceId()
             val deviceName = deviceProvider.getDeviceName()
@@ -31,15 +32,26 @@ class AuthRepositoryImpl @Inject constructor(
             )
 
             val response = authApiService.registerDevice(request)
-            if (response.isSuccessful && response.body() != null) {
-                val token = response.body()!!.token
-                authPreferences.saveAuthToken(token)
-                authPreferences.saveDeviceId(deviceId)
-                Result.success(token)
+            if (response.isSuccessful) {
+                val body = response.body()
+                if (body != null && body.token.isNotEmpty()) {
+                    val token = body.token
+                    authPreferences.saveAuthToken(token)
+                    authPreferences.saveDeviceId(deviceId)
+                    com.example.leadhunters.util.CrashReporter.log("Device registered successfully")
+                    Result.success(token)
+                } else {
+                    val errorMsg = "Registration failed: Empty response body or token"
+                    com.example.leadhunters.util.CrashReporter.log("ERROR: $errorMsg")
+                    Result.failure(Exception(errorMsg))
+                }
             } else {
-                Result.failure(Exception("Registration failed: ${response.code()}"))
+                val errorMsg = "Registration failed with code: ${response.code()}"
+                com.example.leadhunters.util.CrashReporter.log("ERROR: $errorMsg")
+                Result.failure(Exception(errorMsg))
             }
         } catch (e: Exception) {
+            com.example.leadhunters.util.CrashReporter.logError(e, "Unexpected error during device registration")
             Result.failure(e)
         }
     }

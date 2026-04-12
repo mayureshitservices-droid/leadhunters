@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "816971137278",
+    "project_id": "leadhuntersbydecisionmakers",
+    "storage_bucket": "leadhuntersbydecisionmakers.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:816971137278:android:1d25c633d039b1d7b9e5af",
+        "android_client_info": {
+          "package_name": "com.example.leadhunters"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCFbVw0Cd9KYVmk_vuKXy6xwOnWZZdkQ7c"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

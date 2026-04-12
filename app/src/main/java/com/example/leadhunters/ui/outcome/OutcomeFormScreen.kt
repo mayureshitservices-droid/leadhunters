@@ -10,6 +10,7 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -28,6 +29,18 @@ fun OutcomeFormScreen(
     
     LaunchedEffect(callLogId) {
         viewModel.loadCall(callLogId)
+    }
+
+    val context = androidx.compose.ui.platform.LocalContext.current
+    LaunchedEffect(uiState) {
+        when (val state = uiState) {
+            is OutcomeUiState.Success -> onSuccess()
+            is OutcomeUiState.Error -> {
+                android.widget.Toast.makeText(context, state.message, android.widget.Toast.LENGTH_SHORT).show()
+                viewModel.clearError()
+            }
+            else -> {}
+        }
     }
 
     Scaffold(
@@ -61,7 +74,7 @@ fun OutcomeFormScreen(
                 )
             }
             is OutcomeUiState.Success -> {
-                LaunchedEffect(Unit) { onSuccess() }
+                // Already handled in LaunchedEffect
             }
             else -> {
                 Box(modifier = Modifier.fillMaxSize().padding(padding)) {
@@ -80,17 +93,19 @@ fun OutcomeForm(
     modifier: Modifier = Modifier,
     onSubmit: (String, String, String?, Long?) -> Unit
 ) {
-    var customerName by remember { mutableStateOf(initialName) }
-    var selectedType by remember { mutableStateOf("Interested") }
-    var remarks by remember { mutableStateOf("") }
-    var expanded by remember { mutableStateOf(false) }
+    var customerName by rememberSaveable { mutableStateOf(initialName) }
+    var selectedType by rememberSaveable { mutableStateOf("Interested") }
+    var remarks by rememberSaveable { mutableStateOf("") }
+    var expanded by remember { mutableStateOf(false) } // This one is fine to reset
     
     // Reminder States
-    var selectedDate by remember { mutableStateOf<Long?>(null) }
-    var selectedTime by remember { mutableStateOf<Pair<Int, Int>?>(null) }
+    var selectedDate by rememberSaveable { mutableStateOf<Long?>(null) }
+    var selectedTime by rememberSaveable {
+        mutableStateOf<Pair<Int, Int>?>(null)
+    }
     
-    var showDatePicker by remember { mutableStateOf(false) }
-    var showTimePicker by remember { mutableStateOf(false) }
+    var showDatePicker by rememberSaveable { mutableStateOf(false) }
+    var showTimePicker by rememberSaveable { mutableStateOf(false) }
 
     val types = listOf("Interested", "Ordered", "Booked", "Remind later", "Lost")
     val isReminder = selectedType == "Remind later"
