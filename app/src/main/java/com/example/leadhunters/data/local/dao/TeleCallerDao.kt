@@ -18,6 +18,12 @@ interface TeleCallerDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertLead(lead: Lead)
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertLeads(leads: List<Lead>)
+
+    @Query("DELETE FROM leads")
+    suspend fun clearLeads()
+
     @Update
     suspend fun updateLead(lead: Lead)
 

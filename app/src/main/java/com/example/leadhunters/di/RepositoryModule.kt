@@ -5,6 +5,8 @@ import com.example.leadhunters.data.repository.AuthRepository
 import com.example.leadhunters.data.repository.AuthRepositoryImpl
 import com.example.leadhunters.data.repository.CallRepository
 import com.example.leadhunters.data.repository.CallRepositoryImpl
+import com.example.leadhunters.data.repository.WorkRepository
+import com.example.leadhunters.data.repository.WorkRepositoryImpl
 import dagger.Binds
 import dagger.Module
 import dagger.Provides
@@ -19,6 +21,10 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindAuthRepository(impl: AuthRepositoryImpl): AuthRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindWorkRepository(impl: WorkRepositoryImpl): WorkRepository
 
     companion object {
         @Provides

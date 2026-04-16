@@ -14,7 +14,8 @@ import kotlinx.coroutines.flow.first
 class SyncWorker @AssistedInject constructor(
     @Assisted context: Context,
     @Assisted params: WorkerParameters,
-    private val teleCallerDao: TeleCallerDao
+    private val teleCallerDao: TeleCallerDao,
+    private val workRepository: com.example.leadhunters.data.repository.WorkRepository
 ) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
@@ -40,8 +41,22 @@ class SyncWorker @AssistedInject constructor(
     }
 
     private suspend fun processSyncItem(item: SyncItem): Boolean {
-        // Here we would call the "Pluggable" Sync Action
-        // For now, it's a placeholder returning true
-        return true
+        return when (item.type) {
+            "CALL_LOG" -> {
+                val callLog = teleCallerDao.getCallLogById(item.referenceId.toLong())
+                if (callLog != null) {
+                    val syncResult = workRepository.syncCallLog(
+                        leadId = callLog.leadId,
+                        durationSeconds = callLog.duration?.toInt() ?: 0,
+                        status = callLog.status,
+                        notes = null // Could be expanded later
+                    )
+                    syncResult.isSuccess
+                } else {
+                    true // Item gone, consider it "synced" to clear queue
+                }
+            }
+            else -> true
+        }
     }
 }

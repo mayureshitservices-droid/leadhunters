@@ -66,4 +66,8 @@ class CallRepositoryImpl @Inject constructor(
     override suspend fun insertReminder(reminder: Reminder): Long {
         return teleCallerDao.insertReminder(reminder)
     }
+
+    override suspend fun enqueueSync(item: com.example.leadhunters.data.local.entities.SyncItem) {
+        teleCallerDao.insertSyncItem(item)
+    }
 }

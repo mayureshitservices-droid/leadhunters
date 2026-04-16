@@ -2,6 +2,7 @@ package com.example.leadhunters.di
 
 import com.example.leadhunters.data.remote.AuthInterceptor
 import com.example.leadhunters.data.remote.api.AuthApiService
+import com.example.leadhunters.data.remote.api.WorkApiService
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -55,5 +56,11 @@ object NetworkModule {
     @Singleton
     fun provideAuthApiService(retrofit: Retrofit): AuthApiService {
         return retrofit.create(AuthApiService::class.java)
+    }
+
+    @Provides
+    @Singleton
+    fun provideWorkApiService(retrofit: Retrofit): WorkApiService {
+        return retrofit.create(WorkApiService::class.java)
     }
 }

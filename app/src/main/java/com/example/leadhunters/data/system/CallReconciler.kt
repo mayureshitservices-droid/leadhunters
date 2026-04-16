@@ -15,7 +15,7 @@ class CallReconciler @Inject constructor(
     private val recordingScanner: RecordingScanner
 ) {
 
-    suspend fun reconcile(phoneNumber: String) {
+    suspend fun reconcile(phoneNumber: String, leadId: String?) {
         try {
             val pendingLogs = repository.getUnreconciledLogsForNumber(phoneNumber)
             if (pendingLogs.isEmpty()) return
@@ -70,6 +70,24 @@ class CallReconciler @Inject constructor(
                                 duration = duration,
                                 status = status,
                                 systemCallLogId = systemId
+                            )
+
+                            // If we have a leadId from context but not in the log, update it
+                            if (pendingLog.leadId == "AD_HOC" && leadId != null) {
+                                val currentLog = repository.getLogById(pendingLog.id)
+                                if (currentLog != null) {
+                                    repository.updateLog(currentLog.copy(leadId = leadId))
+                                }
+                            }
+
+                            // Enqueue Sync
+                            repository.enqueueSync(
+                                com.example.leadhunters.data.local.entities.SyncItem(
+                                    type = "CALL_LOG",
+                                    referenceId = pendingLog.id.toString(),
+                                    operation = "CREATE",
+                                    payload = "" // SyncWorker will fetch the data
+                                )
                             )
                             
                             // Update with recording if found

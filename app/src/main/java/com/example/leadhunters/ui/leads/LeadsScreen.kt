@@ -3,88 +3,140 @@ package com.example.leadhunters.ui.leads
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import android.os.Build
-import android.os.Environment
-import android.provider.Settings
 import android.Manifest
 import android.content.pm.PackageManager
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Business
 import androidx.compose.material.icons.filled.Call
+import androidx.compose.material.icons.filled.FilterList
+import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.leadhunters.data.local.entities.Lead
 import com.example.leadhunters.service.CallService
+import com.example.leadhunters.ui.theme.SuccessEmerald
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LeadsScreen(
     viewModel: LeadsViewModel = hiltViewModel()
 ) {
-    val leads by viewModel.leads.collectAsState()
-    var showDialog by remember { mutableStateOf(false) }
+    val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
-    
-    val permissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        if (!isGranted) {
-            // Handle denial
-        }
-    }
 
     Scaffold(
-        floatingActionButton = {
-            FloatingActionButton(onClick = { showDialog = true }) {
-                Icon(Icons.Default.Add, contentDescription = "Add Lead")
-            }
+        topBar = {
+            TopAppBar(
+                title = { Text("My Leads", fontWeight = FontWeight.Bold) },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background,
+                    titleContentColor = MaterialTheme.colorScheme.primary
+                )
+            )
         }
     ) { padding ->
-        LazyColumn(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+                .padding(padding)
+                .background(MaterialTheme.colorScheme.background)
         ) {
-            items(leads) { lead ->
-                LeadItem(lead = lead, onCallClick = { 
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                        if (!Environment.isExternalStorageManager()) {
-                            val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
-                                data = Uri.parse("package:${context.packageName}")
-                            }
-                            context.startActivity(intent)
-                            return@LeadItem
+            // Business Owner Filter Bar
+            BusinessOwnerFilterBar(
+                owners = uiState.businessOwners,
+                selectedId = uiState.selectedBusinessOwnerId,
+                onSelect = { viewModel.filterByBusinessOwner(it) }
+            )
+
+            if (uiState.isLoading && uiState.leads.isEmpty()) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
+            } else if (uiState.leads.isEmpty()) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(
+                            Icons.Default.FilterList, 
+                            contentDescription = null, 
+                            modifier = Modifier.size(64.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            "No leads found for this filter",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        TextButton(onClick = { viewModel.refreshLeads() }) {
+                            Text("Refresh List")
                         }
                     }
-
-                    if (ContextCompat.checkSelfPermission(context, Manifest.permission.CALL_PHONE) == PackageManager.PERMISSION_GRANTED) {
-                        makeCall(context, lead)
-                    } else {
-                        permissionLauncher.launch(Manifest.permission.CALL_PHONE)
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    items(uiState.leads, key = { it.id }) { lead ->
+                        LeadItemCard(
+                            lead = lead,
+                            onCallClick = { makeCall(context, lead) }
+                        )
                     }
-                })
+                }
             }
         }
-// ...
+    }
+}
 
-        if (showDialog) {
-            AddLeadDialog(
-                onDismiss = { showDialog = false },
-                onConfirm = { name, phone ->
-                    viewModel.addLead(name, phone)
-                    showDialog = false
+@Composable
+fun BusinessOwnerFilterBar(
+    owners: List<BusinessOwnerFilter>,
+    selectedId: String?,
+    onSelect: (String?) -> Unit
+) {
+    LazyRow(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        contentPadding = PaddingValues(horizontal = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        item {
+            FilterChip(
+                selected = selectedId == null,
+                onClick = { onSelect(null) },
+                label = { Text("All Owners") }
+            )
+        }
+        items(owners) { owner ->
+            FilterChip(
+                selected = selectedId == owner.id,
+                onClick = { onSelect(owner.id) },
+                label = { Text(owner.name) },
+                leadingIcon = {
+                    Icon(
+                        Icons.Default.Business,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
                 }
             )
         }
@@ -92,78 +144,115 @@ fun LeadsScreen(
 }
 
 @Composable
-fun LeadItem(lead: Lead, onCallClick: () -> Unit) {
+fun LeadItemCard(lead: Lead, onCallClick: () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .padding(16.dp)
-                .fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+                .fillMaxWidth()
         ) {
-            Column {
-                Text(text = lead.name, style = MaterialTheme.typography.titleMedium)
-                Text(text = lead.phoneNumber, style = MaterialTheme.typography.bodySmall)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = lead.name,
+                        style = MaterialTheme.typography.titleLarge.copy(
+                            fontWeight = FontWeight.ExtraBold,
+                            letterSpacing = 0.sp
+                        ),
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    
+                    // Business Owner Badge
+                    Surface(
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                Icons.Default.Business,
+                                contentDescription = null,
+                                modifier = Modifier.size(12.dp),
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = lead.businessOwnerName,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        }
+                    }
+                }
+
+                FilledIconButton(
+                    onClick = onCallClick,
+                    modifier = Modifier.size(56.dp),
+                    colors = IconButtonDefaults.filledIconButtonColors(
+                        containerColor = SuccessEmerald,
+                        contentColor = Color.White
+                    )
+                ) {
+                    Icon(Icons.Default.Call, contentDescription = "Call Now")
+                }
             }
-            IconButton(onClick = onCallClick) {
-                Icon(Icons.Default.Call, contentDescription = "Call", tint = MaterialTheme.colorScheme.primary)
+
+            Spacer(modifier = Modifier.height(12.dp))
+            Divider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.Default.Phone,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = lead.phoneNumber,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontWeight = FontWeight.Medium
+                )
             }
         }
     }
-}
-
-@Composable
-fun AddLeadDialog(onDismiss: () -> Unit, onConfirm: (String, String) -> Unit) {
-    var name by remember { mutableStateOf("") }
-    var phone by remember { mutableStateOf("") }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Add New Lead") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                TextField(value = name, onValueChange = { name = it }, label = { Text("Name") })
-                TextField(value = phone, onValueChange = { phone = it }, label = { Text("Phone Number") })
-            }
-        },
-        confirmButton = {
-            Button(onClick = { onConfirm(name, phone) }) { Text("Add") }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
-        }
-    )
 }
 
 private fun makeCall(context: Context, lead: Lead) {
-    // 1. Start Service Defensively
+    // Defensively start the tracking service
     val serviceIntent = Intent(context, CallService::class.java).apply {
         action = CallService.ACTION_START_TRACKING
         putExtra(CallService.EXTRA_PHONE_NUMBER, lead.phoneNumber)
+        putExtra(CallService.EXTRA_LEAD_ID, lead.id) // Pass lead ID for reconciliation
     }
+    
     try {
         ContextCompat.startForegroundService(context, serviceIntent)
     } catch (e: Exception) {
-        android.util.Log.e("Leads", "Tracking service blocked", e)
+        // Log block
     }
 
-    // 2. Initiate Intent.ACTION_CALL with Fallback
-    if (ContextCompat.checkSelfPermission(context, Manifest.permission.CALL_PHONE) == PackageManager.PERMISSION_GRANTED) {
-        val callIntent = Intent(Intent.ACTION_CALL).apply {
-            data = Uri.parse("tel:${lead.phoneNumber}")
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK
-        }
-        try {
-            context.startActivity(callIntent)
-        } catch (e: Exception) {
-            val fallback = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${lead.phoneNumber}")).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK }
-            context.startActivity(fallback)
-        }
+    val phoneNumber = lead.phoneNumber
+    val intent = if (ContextCompat.checkSelfPermission(context, Manifest.permission.CALL_PHONE) == PackageManager.PERMISSION_GRANTED) {
+        Intent(Intent.ACTION_CALL, Uri.parse("tel:$phoneNumber"))
     } else {
-        val fallback = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${lead.phoneNumber}")).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK }
-        context.startActivity(fallback)
+        Intent(Intent.ACTION_DIAL, Uri.parse("tel:$phoneNumber"))
     }
+    intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
+    context.startActivity(intent)
 }

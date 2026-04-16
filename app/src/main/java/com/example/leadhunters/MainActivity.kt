@@ -22,6 +22,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.leadhunters.ui.theme.LeadHuntersTheme
 import com.example.leadhunters.ui.dashboard.DashboardScreen
+import com.example.leadhunters.ui.leads.LeadsScreen
 import com.example.leadhunters.ui.logs.CallLogsScreen
 import com.example.leadhunters.ui.reminders.RemindersScreen
 import com.example.leadhunters.ui.more.MoreScreen
@@ -106,6 +107,9 @@ fun MainScreen() {
             composable(AppDestinations.DASHBOARD.route) {
                 DashboardScreen()
             }
+            composable(AppDestinations.LEADS.route) {
+                com.example.leadhunters.ui.leads.LeadsScreen()
+            }
             composable(AppDestinations.LOGS.route) {
                 CallLogsScreen(
                     onOutcomeClick = { callId -> navController.navigate("outcome/$callId") },
@@ -155,6 +159,7 @@ enum class AppDestinations(
     val route: String
 ) {
     DASHBOARD("Dashboard", Icons.Default.Dashboard, "dashboard"),
+    LEADS("My Leads", Icons.Default.ContactPhone, "leads"),
     LOGS("Logs", Icons.Default.List, "logs"),
     REMINDERS("Reminders", Icons.Default.Notifications, "reminders"),
     MORE("More", Icons.Default.Menu, "more")

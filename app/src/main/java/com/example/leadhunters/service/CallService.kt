@@ -34,6 +34,7 @@ class CallService : Service() {
         const val ACTION_START_TRACKING = "ACTION_START_TRACKING"
         const val ACTION_STOP_TRACKING = "ACTION_STOP_TRACKING"
         const val EXTRA_PHONE_NUMBER = "EXTRA_PHONE_NUMBER"
+        const val EXTRA_LEAD_ID = "EXTRA_LEAD_ID"
     }
 
     override fun onCreate() {
@@ -82,14 +83,15 @@ class CallService : Service() {
                 } catch (e: Exception) {
                     Log.e("CallService", "Fatal error in onStartCommand foreground logic", e)
                 }
-                registerTracking(phoneNumber)
+                val leadId = intent.getStringExtra(EXTRA_LEAD_ID)
+                registerTracking(phoneNumber, leadId)
             }
             ACTION_STOP_TRACKING -> stopSelf()
         }
         return START_STICKY
     }
 
-    private fun registerTracking(targetNumber: String) {
+    private fun registerTracking(targetNumber: String, leadId: String?) {
         // Cleanup previous if any
         unregisterTracking()
 
@@ -97,7 +99,7 @@ class CallService : Service() {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 val telephonyCallback = object : TelephonyCallback(), TelephonyCallback.CallStateListener {
                     override fun onCallStateChanged(state: Int) {
-                        handleCallStateChange(state, targetNumber)
+                        handleCallStateChange(state, targetNumber, leadId)
                     }
                 }
                 telephonyManager.registerTelephonyCallback(mainExecutor, telephonyCallback)
@@ -106,7 +108,7 @@ class CallService : Service() {
                 val listener = @Suppress("DEPRECATION") object : PhoneStateListener() {
                     @Deprecated("Deprecated in Java")
                     override fun onCallStateChanged(state: Int, phoneNumber: String?) {
-                        handleCallStateChange(state, targetNumber)
+                        handleCallStateChange(state, targetNumber, leadId)
                     }
                 }
                 @Suppress("DEPRECATION")
@@ -119,7 +121,7 @@ class CallService : Service() {
 
         callLogObserver = CallLogObserver(this) { 
             serviceScope.launch {
-                reconciler.reconcile(targetNumber)
+                reconciler.reconcile(targetNumber, leadId)
             }
         }
         callLogObserver?.register()
@@ -140,13 +142,13 @@ class CallService : Service() {
         callback = null
     }
 
-    private fun handleCallStateChange(state: Int, targetNumber: String) {
+    private fun handleCallStateChange(state: Int, targetNumber: String, leadId: String?) {
         when (state) {
             TelephonyManager.CALL_STATE_IDLE -> {
                 Log.d("CallService", "Call IDLE")
                 serviceScope.launch {
                     delay(2000) 
-                    reconciler.reconcile(targetNumber)
+                    reconciler.reconcile(targetNumber, leadId)
                 }
             }
             TelephonyManager.CALL_STATE_OFFHOOK -> {

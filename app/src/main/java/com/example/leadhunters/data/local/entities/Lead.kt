@@ -9,6 +9,8 @@ data class Lead(
     val name: String,
     val phoneNumber: String,
     val status: String = "PENDING",
+    val businessOwnerId: String,
+    val businessOwnerName: String,
     val lastCallTimestamp: Long? = null,
     val callCount: Int = 0
 )

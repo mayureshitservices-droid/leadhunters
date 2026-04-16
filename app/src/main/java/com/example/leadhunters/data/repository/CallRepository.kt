@@ -20,4 +20,7 @@ interface CallRepository {
     // Reminders
     fun getReminders(): Flow<List<Reminder>>
     suspend fun insertReminder(reminder: Reminder): Long
+
+    // Sync
+    suspend fun enqueueSync(item: com.example.leadhunters.data.local.entities.SyncItem)
 }
