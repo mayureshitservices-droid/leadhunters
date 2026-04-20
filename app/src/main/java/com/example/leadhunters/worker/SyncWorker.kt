@@ -15,13 +15,16 @@ class SyncWorker @AssistedInject constructor(
     @Assisted context: Context,
     @Assisted params: WorkerParameters,
     private val teleCallerDao: TeleCallerDao,
-    private val workRepository: com.example.leadhunters.data.repository.WorkRepository
+    private val workRepository: com.example.leadhunters.data.repository.WorkRepository,
+    private val analyticsHelper: com.example.leadhunters.util.AnalyticsHelper
 ) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
         val pendingItems = teleCallerDao.getPendingSyncItems().first()
         
         if (pendingItems.isEmpty()) return Result.success()
+
+        analyticsHelper.logSyncWorkerTriggered(pendingItems.size)
 
         var successCount = 0
         for (item in pendingItems) {

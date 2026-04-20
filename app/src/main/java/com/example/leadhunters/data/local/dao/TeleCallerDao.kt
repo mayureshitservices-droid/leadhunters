@@ -37,6 +37,9 @@ interface TeleCallerDao {
     @Query("SELECT * FROM app_call_logs WHERE phoneNumber = :number AND isReconciled = 0 ORDER BY startTime DESC")
     suspend fun getAllUnreconciledLogsForNumber(number: String): List<AppCallLog>
 
+    @Query("SELECT * FROM app_call_logs WHERE isReconciled = 0 ORDER BY startTime DESC")
+    suspend fun getAllUnreconciledLogs(): List<AppCallLog>
+
     @Query("SELECT * FROM app_call_logs WHERE phoneNumber = :number AND isReconciled = 0 ORDER BY startTime DESC LIMIT 1")
     suspend fun getLatestUnreconciledLogForNumber(number: String): AppCallLog?
 

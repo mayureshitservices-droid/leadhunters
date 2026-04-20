@@ -2,8 +2,10 @@ package com.example.leadhunters.data.system
 
 import android.content.Context
 import android.provider.CallLog
+import android.telephony.PhoneNumberUtils
 import android.util.Log
 import com.example.leadhunters.data.repository.CallRepository
+import com.example.leadhunters.util.AnalyticsHelper
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -12,13 +14,21 @@ import javax.inject.Singleton
 class CallReconciler @Inject constructor(
     @ApplicationContext private val context: Context,
     private val repository: CallRepository,
-    private val recordingScanner: RecordingScanner
+    private val recordingScanner: RecordingScanner,
+    private val analyticsHelper: AnalyticsHelper
 ) {
 
     suspend fun reconcile(phoneNumber: String, leadId: String?) {
         try {
-            val pendingLogs = repository.getUnreconciledLogsForNumber(phoneNumber)
-            if (pendingLogs.isEmpty()) return
+            val allPending = repository.getAllUnreconciledLogs()
+            val pendingLogs = allPending.filter { 
+                PhoneNumberUtils.compare(context, phoneNumber, it.phoneNumber)
+            }
+
+            if (pendingLogs.isEmpty()) {
+                analyticsHelper.logReconciliation(phoneNumber, false, "No pending logs found (Checked ${allPending.size} total)")
+                return
+            }
             
             Log.d("CallReconciler", "Attempting reconcile for ${pendingLogs.size} logs for $phoneNumber")
             
@@ -27,23 +37,31 @@ class CallReconciler @Inject constructor(
                     val cursor = context.contentResolver.query(
                         CallLog.Calls.CONTENT_URI,
                         null,
-                        "${CallLog.Calls.NUMBER} = ? AND ${CallLog.Calls.DATE} >= ?",
-                        arrayOf(phoneNumber, (pendingLog.startTime - 60000).toString()), // 60s buffer for better safety
+                        "${CallLog.Calls.DATE} >= ?",
+                        arrayOf((pendingLog.startTime - 60000).toString()), // 60s buffer
                         "${CallLog.Calls.DATE} DESC"
                     )
 
                     cursor?.use {
-                        if (it.moveToFirst()) {
+                        var matched = false
+                        while (it.moveToNext()) {
                             val durationIdx = it.getColumnIndex(CallLog.Calls.DURATION)
                             val typeIdx = it.getColumnIndex(CallLog.Calls.TYPE)
                             val dateIdx = it.getColumnIndex(CallLog.Calls.DATE)
                             val idIdx = it.getColumnIndex(CallLog.Calls._ID)
+                            val systemNumberIdx = it.getColumnIndex(CallLog.Calls.NUMBER)
 
-                            if (durationIdx == -1 || typeIdx == -1 || dateIdx == -1 || idIdx == -1) {
-                                Log.w("CallReconciler", "Missing required CallLog columns")
-                                return@use
+                            if (durationIdx == -1 || typeIdx == -1 || dateIdx == -1 || idIdx == -1 || systemNumberIdx == -1) {
+                                continue
                             }
 
+                            val systemNumber = it.getString(systemNumberIdx)
+                            if (!PhoneNumberUtils.compare(context, phoneNumber, systemNumber)) {
+                                continue
+                            }
+                            
+                            // Found a match!
+                            matched = true
                             val duration = it.getLong(durationIdx)
                             val type = it.getInt(typeIdx)
                             val date = it.getLong(dateIdx)
@@ -99,16 +117,26 @@ class CallReconciler @Inject constructor(
                             }
                             
                             Log.d("CallReconciler", "Reconciled log ${pendingLog.id} with system ID $systemId")
+                            analyticsHelper.logReconciliation(phoneNumber, true, "Matched system ID $systemId")
+                            break // Stop after first match
+                        }
+                        
+                        if (!matched) {
+                            Log.d("CallReconciler", "No matching call found in system log for $phoneNumber")
+                            analyticsHelper.logReconciliation(phoneNumber, false, "No matching number in recent calls")
                         }
                     }
                 } catch (e: SecurityException) {
                     Log.e("CallReconciler", "Permission denied querying CallLog for $phoneNumber", e)
+                    analyticsHelper.logReconciliation(phoneNumber, false, "Permission denied")
                 } catch (e: Exception) {
                     Log.e("CallReconciler", "Unexpected error reconciling log ${pendingLog.id}", e)
+                    analyticsHelper.logReconciliation(phoneNumber, false, e.javaClass.simpleName)
                 }
             }
         } catch (e: Exception) {
             Log.e("CallReconciler", "Fatal error in reconcile loop for $phoneNumber", e)
+            analyticsHelper.logReconciliation(phoneNumber, false, "Fatal error: ${e.javaClass.simpleName}")
         }
     }
 }

@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.leadhunters.data.local.entities.Lead
 import com.example.leadhunters.data.repository.CallRepository
 import com.example.leadhunters.data.repository.WorkRepository
+import com.example.leadhunters.util.AnalyticsHelper
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -26,7 +27,8 @@ data class BusinessOwnerFilter(
 @HiltViewModel
 class LeadsViewModel @Inject constructor(
     private val workRepository: WorkRepository,
-    private val callRepository: CallRepository
+    private val callRepository: CallRepository,
+    private val analyticsHelper: AnalyticsHelper
 ) : ViewModel() {
 
     private val _selectedBusinessOwnerId = MutableStateFlow<String?>(null)
@@ -76,6 +78,7 @@ class LeadsViewModel @Inject constructor(
     }
 
     suspend fun startCall(lead: Lead): Long {
+        analyticsHelper.logCallStarted(lead.id, lead.phoneNumber)
         return callRepository.startCall(lead.id, lead.phoneNumber)
     }
 

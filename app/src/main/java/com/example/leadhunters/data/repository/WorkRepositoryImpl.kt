@@ -4,6 +4,7 @@ import com.example.leadhunters.data.local.dao.TeleCallerDao
 import com.example.leadhunters.data.local.entities.Lead
 import com.example.leadhunters.data.remote.api.WorkApiService
 import com.example.leadhunters.data.remote.model.CallLogSyncRequest
+import com.example.leadhunters.util.AnalyticsHelper
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -11,7 +12,8 @@ import javax.inject.Singleton
 @Singleton
 class WorkRepositoryImpl @Inject constructor(
     private val apiService: WorkApiService,
-    private val teleCallerDao: TeleCallerDao
+    private val teleCallerDao: TeleCallerDao,
+    private val analyticsHelper: AnalyticsHelper
 ) : WorkRepository {
 
     override fun getLeads(): Flow<List<Lead>> = teleCallerDao.getAllLeads()
@@ -57,11 +59,15 @@ class WorkRepositoryImpl @Inject constructor(
             )
             val response = apiService.syncCallLog(request)
             if (response.isSuccessful) {
+                analyticsHelper.logApiSyncResult(leadId, response.code(), true, null)
                 Result.success(Unit)
             } else {
-                Result.failure(Exception("Failed to sync call log: ${response.message()}"))
+                val errorBody = response.errorBody()?.string() ?: response.message()
+                analyticsHelper.logApiSyncResult(leadId, response.code(), false, errorBody)
+                Result.failure(Exception("Failed to sync call log [${response.code()}]: $errorBody"))
             }
         } catch (e: Exception) {
+            analyticsHelper.logApiSyncResult(leadId, -1, false, e.message)
             Result.failure(e)
         }
     }

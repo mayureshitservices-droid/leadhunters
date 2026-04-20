@@ -19,6 +19,7 @@ import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -39,6 +40,7 @@ fun LeadsScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
 
     Scaffold(
         topBar = {
@@ -97,7 +99,12 @@ fun LeadsScreen(
                     items(uiState.leads, key = { it.id }) { lead ->
                         LeadItemCard(
                             lead = lead,
-                            onCallClick = { makeCall(context, lead) }
+                            onCallClick = { 
+                                coroutineScope.launch {
+                                    viewModel.startCall(lead)
+                                    makeCall(context, lead) 
+                                }
+                            }
                         )
                     }
                 }

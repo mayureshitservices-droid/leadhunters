@@ -1,14 +1,23 @@
 package com.example.leadhunters.data.repository
 
+import android.content.Context
+import androidx.work.ExistingWorkPolicy
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkManager
 import com.example.leadhunters.data.local.dao.TeleCallerDao
 import com.example.leadhunters.data.local.entities.AppCallLog
 import com.example.leadhunters.data.local.entities.Lead
 import com.example.leadhunters.data.local.entities.Reminder
+import com.example.leadhunters.worker.SyncWorker
+import com.example.leadhunters.util.AnalyticsHelper
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 
 class CallRepositoryImpl @Inject constructor(
-    private val teleCallerDao: TeleCallerDao
+    private val teleCallerDao: TeleCallerDao,
+    @ApplicationContext private val context: Context,
+    private val analyticsHelper: AnalyticsHelper
 ) : CallRepository {
 
     override fun getLeads(): Flow<List<Lead>> = teleCallerDao.getAllLeads()
@@ -27,7 +36,14 @@ class CallRepositoryImpl @Inject constructor(
             type = "OUTGOING",
             status = "PENDING"
         )
-        return teleCallerDao.insertCallLog(log)
+        return try {
+            val rowId = teleCallerDao.insertCallLog(log)
+            analyticsHelper.logCallPendingCreated(rowId, phoneNumber, true)
+            rowId
+        } catch (e: Exception) {
+            analyticsHelper.logCallPendingCreated(-1L, phoneNumber, false, e.message)
+            throw e
+        }
     }
 
     override suspend fun finalizeCall(callLogId: Long, duration: Long, status: String, systemCallLogId: Long?) {
@@ -57,6 +73,10 @@ class CallRepositoryImpl @Inject constructor(
         return teleCallerDao.getAllUnreconciledLogsForNumber(number)
     }
 
+    override suspend fun getAllUnreconciledLogs(): List<AppCallLog> {
+        return teleCallerDao.getAllUnreconciledLogs()
+    }
+
     override suspend fun insertOutcome(outcome: com.example.leadhunters.data.local.entities.CallOutcome): Long {
         return teleCallerDao.insertOutcome(outcome)
     }
@@ -67,7 +87,17 @@ class CallRepositoryImpl @Inject constructor(
         return teleCallerDao.insertReminder(reminder)
     }
 
+    private fun triggerSyncWorker() {
+        val request = OneTimeWorkRequestBuilder<SyncWorker>().build()
+        WorkManager.getInstance(context).enqueueUniqueWork(
+            "CallSyncWorker",
+            ExistingWorkPolicy.APPEND_OR_REPLACE,
+            request
+        )
+    }
+
     override suspend fun enqueueSync(item: com.example.leadhunters.data.local.entities.SyncItem) {
         teleCallerDao.insertSyncItem(item)
+        triggerSyncWorker()
     }
 }
