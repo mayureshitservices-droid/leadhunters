@@ -35,6 +35,9 @@ import com.example.leadhunters.ui.theme.WarningStatus
 import com.example.leadhunters.ui.theme.ErrorCoral
 import kotlinx.coroutines.launch
 import java.io.File
+import com.example.leadhunters.ui.components.CallStatusBadge
+import com.example.leadhunters.ui.components.formatDuration
+import com.example.leadhunters.ui.components.formatDurationMs
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -432,27 +435,4 @@ fun EnhancedCallLogItem(
     }
 }
 
-fun formatDurationMs(ms: Int): String {
-    val totalSeconds = ms / 1000
-    val minutes = totalSeconds / 60
-    val seconds = totalSeconds % 60
-    return String.format("%02d:%02d", minutes, seconds)
-}
-
-@Composable
-fun CallStatusBadge(status: String) {
-    val (label, color, icon) = when (status.uppercase()) {
-        "ANSWERED" -> Triple("Answered", com.example.leadhunters.ui.theme.SuccessEmerald, Icons.AutoMirrored.Filled.CallMade)
-        "MISSED" -> Triple("Missed", com.example.leadhunters.ui.theme.ErrorCoral, Icons.AutoMirrored.Filled.CallMissed)
-        "REJECTED", "UNANSWERED" -> Triple("Rejected", androidx.compose.ui.graphics.Color.Gray, Icons.Default.Block)
-        else -> Triple(status, androidx.compose.ui.graphics.Color.Gray, Icons.AutoMirrored.Filled.HelpOutline)
-    }
-    
-    AppBadge(text = label, icon = icon, backgroundColor = color, contentColor = color)
-}
-
-fun formatDuration(seconds: Long): String {
-    val mins = seconds / 60
-    val secs = seconds % 60
-    return String.format("%02d:%02d", mins, secs)
-}
+// Removed local formatDuration and formatDurationMs as they are now in CallLogComponents.kt

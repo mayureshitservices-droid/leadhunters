@@ -81,6 +81,8 @@ class CallRepositoryImpl @Inject constructor(
         return teleCallerDao.insertOutcome(outcome)
     }
 
+    override fun getAllOutcomes(): Flow<List<com.example.leadhunters.data.local.entities.CallOutcome>> = teleCallerDao.getAllOutcomes()
+
     override fun getReminders(): Flow<List<Reminder>> = teleCallerDao.getAllReminders()
 
     override suspend fun insertReminder(reminder: Reminder): Long {

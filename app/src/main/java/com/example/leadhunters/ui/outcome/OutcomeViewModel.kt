@@ -98,6 +98,16 @@ class OutcomeViewModel @Inject constructor(
                 }
 
                 _uiState.value = OutcomeUiState.Success
+                
+                // 3. Enqueue Sync for the call log (SyncWorker will now fetch the outcome)
+                repository.enqueueSync(
+                    com.example.leadhunters.data.local.entities.SyncItem(
+                        type = "CALL_LOG",
+                        referenceId = callId.toString(),
+                        operation = "UPDATE",
+                        payload = ""
+                    )
+                )
             } catch (e: Exception) {
                 _uiState.value = OutcomeUiState.Error("Failed to save outcome: ${e.message}", currentFormState ?: OutcomeUiState.Idle)
             }

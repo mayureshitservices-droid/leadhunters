@@ -17,6 +17,7 @@ interface CallRepository {
     suspend fun getUnreconciledLogsForNumber(number: String): List<AppCallLog>
     suspend fun getAllUnreconciledLogs(): List<AppCallLog>
     suspend fun insertOutcome(outcome: com.example.leadhunters.data.local.entities.CallOutcome): Long
+    fun getAllOutcomes(): Flow<List<com.example.leadhunters.data.local.entities.CallOutcome>>
     
     // Reminders
     fun getReminders(): Flow<List<Reminder>>

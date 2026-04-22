@@ -11,7 +11,16 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.graphics.layer.drawLayer
+import androidx.compose.ui.graphics.rememberGraphicsLayer
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.background
 import androidx.compose.ui.text.font.FontWeight
+import com.example.leadhunters.util.ShareUtils
+import kotlinx.coroutines.launch
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.leadhunters.data.local.dao.CallStats
@@ -30,29 +39,23 @@ fun DashboardScreen(
     val todayStats by viewModel.todayStats.collectAsState()
     val monthStats by viewModel.monthStats.collectAsState()
 
+    val graphicsLayer = rememberGraphicsLayer()
+    val coroutineScope = rememberCoroutineScope()
+
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("Performance", fontWeight = FontWeight.Bold) },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background,
+                    containerColor = Color.White,
                     titleContentColor = MaterialTheme.colorScheme.primary
                 ),
                 actions = {
                     IconButton(
                         onClick = {
-                            val summary = viewModel.getShareSummary()
-                            val intent = Intent(Intent.ACTION_SEND).apply {
-                                type = "text/plain"
-                                `package` = "com.whatsapp"
-                                putExtra(Intent.EXTRA_TEXT, summary)
-                            }
-                            try {
-                                context.startActivity(intent)
-                            } catch (e: Exception) {
-                                // Clear package constraint so chooser can show all apps
-                                intent.setPackage(null)
-                                context.startActivity(Intent.createChooser(intent, "Share Stats"))
+                            coroutineScope.launch {
+                                val bitmap = graphicsLayer.toImageBitmap().asAndroidBitmap()
+                                ShareUtils.shareBitmap(context, bitmap)
                             }
                         }
                     ) {
@@ -62,27 +65,37 @@ fun DashboardScreen(
             )
         }
     ) { innerPadding ->
-        LazyColumn(
+        Surface(
+            color = Color.White,
+            contentColor = Color.Black,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .padding(horizontal = 16.dp),
-            contentPadding = PaddingValues(bottom = 32.dp)
         ) {
-            item {
-                AppSectionHeader(title = "Today", icon = Icons.Default.Today)
-                StatsGrid(stats = todayStats)
-                Spacer(modifier = Modifier.height(24.dp))
-            }
-
-            item {
-                AppSectionHeader(title = "Monthly Overview", icon = Icons.Default.CalendarMonth)
-                StatsGrid(stats = monthStats)
-            }
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .drawWithContent {
+                        graphicsLayer.record {
+                            drawRect(Color.White) // Force solid white background in the capture
+                            this@drawWithContent.drawContent()
+                        }
+                        drawLayer(graphicsLayer)
+                    }
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(24.dp)
+            ) {
+            AppSectionHeader(title = "Today", icon = Icons.Default.Today)
+            StatsGrid(stats = todayStats)
             
-            item { Spacer(modifier = Modifier.height(80.dp)) }
+            AppSectionHeader(title = "Monthly Overview", icon = Icons.Default.CalendarMonth)
+            StatsGrid(stats = monthStats)
+            
+            Spacer(modifier = Modifier.height(40.dp))
         }
     }
+}
 }
 
 @Composable

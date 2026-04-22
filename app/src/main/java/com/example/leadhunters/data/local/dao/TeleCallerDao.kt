@@ -56,6 +56,9 @@ interface TeleCallerDao {
     @Query("SELECT * FROM call_outcomes WHERE callLogId = :callLogId")
     suspend fun getOutcomeForCall(callLogId: Long): CallOutcome?
 
+    @Query("SELECT * FROM call_outcomes ORDER BY timestamp DESC")
+    fun getAllOutcomes(): Flow<List<CallOutcome>>
+
     // Reminders
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertReminder(reminder: Reminder): Long

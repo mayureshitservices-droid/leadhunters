@@ -4,7 +4,7 @@
 
     <style name="Theme.App.Starting" parent="Theme.SplashScreen">
         <item name="windowSplashScreenAnimatedIcon">@drawable/app_icon</item>
-        <item name="windowSplashScreenBackground">#E53935</item> <!-- Brand Red -->
+        <item name="windowSplashScreenBackground">#FFFFFF</item> <!-- Clean White -->
         <item name="postSplashScreenTheme">@style/Theme.LeadHunters</item>
     </style>
 </resources>

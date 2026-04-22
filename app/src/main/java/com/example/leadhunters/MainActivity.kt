@@ -108,7 +108,10 @@ fun MainScreen() {
                 DashboardScreen()
             }
             composable(AppDestinations.LEADS.route) {
-                com.example.leadhunters.ui.leads.LeadsScreen()
+                com.example.leadhunters.ui.leads.LeadsScreen(
+                    onOutcomeClick = { callId -> navController.navigate("outcome/$callId") },
+                    onWhatsAppClick = { number -> navController.navigate("send_template/$number") }
+                )
             }
             composable(AppDestinations.LOGS.route) {
                 CallLogsScreen(

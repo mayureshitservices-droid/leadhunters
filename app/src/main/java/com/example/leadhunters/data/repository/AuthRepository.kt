@@ -30,6 +30,7 @@ class AuthRepositoryImpl @Inject constructor(
                 deviceId = deviceId,
                 name = deviceName
             )
+            com.example.leadhunters.util.CrashReporter.log("Registering device: $deviceName (ID: $deviceId)")
 
             val response = authApiService.registerDevice(request)
             if (response.isSuccessful) {
@@ -46,7 +47,8 @@ class AuthRepositoryImpl @Inject constructor(
                     Result.failure(Exception(errorMsg))
                 }
             } else {
-                val errorMsg = "Registration failed with code: ${response.code()}"
+                val errorBody = response.errorBody()?.string() ?: response.message()
+                val errorMsg = "Registration failed with code: ${response.code()}, body: $errorBody"
                 com.example.leadhunters.util.CrashReporter.log("ERROR: $errorMsg")
                 Result.failure(Exception(errorMsg))
             }

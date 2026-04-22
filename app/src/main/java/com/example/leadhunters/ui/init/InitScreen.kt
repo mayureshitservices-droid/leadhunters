@@ -65,6 +65,30 @@ fun InitScreen(
                         style = MaterialTheme.typography.bodyMedium,
                         textAlign = TextAlign.Center
                     )
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    // Debug info for the user to share
+                    Surface(
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        shape = MaterialTheme.shapes.small
+                    ) {
+                        Column(modifier = Modifier.padding(8.dp)) {
+                            Text(
+                                "Device ID (for backend logs):",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                android.provider.Settings.Secure.getString(
+                                    androidx.compose.ui.platform.LocalContext.current.contentResolver,
+                                    android.provider.Settings.Secure.ANDROID_ID
+                                ) ?: "Unknown",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                            )
+                        }
+                    }
                     Spacer(modifier = Modifier.height(24.dp))
                     Button(onClick = { viewModel.checkRegistration() }) {
                         Text("Retry")

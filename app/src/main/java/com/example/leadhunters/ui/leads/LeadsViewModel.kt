@@ -6,17 +6,25 @@ import com.example.leadhunters.data.local.entities.Lead
 import com.example.leadhunters.data.repository.CallRepository
 import com.example.leadhunters.data.repository.WorkRepository
 import com.example.leadhunters.util.AnalyticsHelper
+import com.example.leadhunters.data.local.dao.TeleCallerDao
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 data class LeadsUiState(
-    val leads: List<Lead> = emptyList(),
+    val leads: List<LeadWithLog> = emptyList(),
     val isLoading: Boolean = false,
     val error: String? = null,
     val selectedBusinessOwnerId: String? = null,
     val businessOwners: List<BusinessOwnerFilter> = emptyList()
+)
+
+data class LeadWithLog(
+    val lead: com.example.leadhunters.data.local.entities.Lead,
+    val latestLog: com.example.leadhunters.data.local.entities.AppCallLog?,
+    val latestOutcome: com.example.leadhunters.data.local.entities.CallOutcome? = null,
+    val isSyncing: Boolean = false
 )
 
 data class BusinessOwnerFilter(
@@ -28,30 +36,60 @@ data class BusinessOwnerFilter(
 class LeadsViewModel @Inject constructor(
     private val workRepository: WorkRepository,
     private val callRepository: CallRepository,
-    private val analyticsHelper: AnalyticsHelper
+    private val teleCallerDao: TeleCallerDao,
+    private val analyticsHelper: AnalyticsHelper,
+    val playbackManager: com.example.leadhunters.ui.logs.CallPlaybackManager
 ) : ViewModel() {
 
     private val _selectedBusinessOwnerId = MutableStateFlow<String?>(null)
     private val _isLoading = MutableStateFlow(false)
     private val _error = MutableStateFlow<String?>(null)
 
+    val playbackState = playbackManager.state
+
     val uiState: StateFlow<LeadsUiState> = combine(
         workRepository.getLeads(),
+        callRepository.getCallLogs(),
+        callRepository.getAllOutcomes(),
+        teleCallerDao.getPendingSyncItems(),
         _selectedBusinessOwnerId,
         _isLoading,
         _error
-    ) { leads, selectedId, loading, error ->
+    ) { args ->
+        val leads = args[0] as List<com.example.leadhunters.data.local.entities.Lead>
+        val logs = args[1] as List<com.example.leadhunters.data.local.entities.AppCallLog>
+        val outcomes = args[2] as List<com.example.leadhunters.data.local.entities.CallOutcome>
+        val syncItems = args[3] as List<com.example.leadhunters.data.local.entities.SyncItem>
+        val selectedId = args[4] as String?
+        val loading = args[5] as Boolean
+        val error = args[6] as String?
+
         val filteredLeads = if (selectedId == null) {
             leads
         } else {
             leads.filter { it.businessOwnerId == selectedId }
         }
 
+        val leadsWithLogs = filteredLeads.map { lead ->
+            val latestLog = logs.filter { it.leadId == lead.id || (it.leadId == "AD_HOC" && it.phoneNumber == lead.phoneNumber) }
+                .maxByOrNull { it.startTime }
+            
+            val latestOutcome = latestLog?.let { log ->
+                outcomes.find { it.callLogId == log.id }
+            }
+            
+            val isSyncing = latestLog?.let { log ->
+                syncItems.any { it.type == "CALL_LOG" && it.referenceId == log.id.toString() && it.status == "PENDING" }
+            } ?: false
+            
+            LeadWithLog(lead, latestLog, latestOutcome, isSyncing)
+        }
+
         val owners = leads.map { BusinessOwnerFilter(it.businessOwnerId, it.businessOwnerName) }
             .distinctBy { it.id }
 
         LeadsUiState(
-            leads = filteredLeads,
+            leads = leadsWithLogs,
             isLoading = loading,
             error = error,
             selectedBusinessOwnerId = selectedId,
@@ -82,9 +120,12 @@ class LeadsViewModel @Inject constructor(
         return callRepository.startCall(lead.id, lead.phoneNumber)
     }
 
-    fun syncCallLog(leadId: String, duration: Int, status: String, notes: String?) {
-        viewModelScope.launch {
-            workRepository.syncCallLog(leadId, duration, status, notes)
-        }
+    fun togglePlayback(logId: Long, filePath: String) {
+        playbackManager.togglePlayback(logId, filePath)
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        playbackManager.stop()
     }
 }

@@ -5,17 +5,22 @@ import android.content.Intent
 import android.net.Uri
 import android.Manifest
 import android.content.pm.PackageManager
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Business
-import androidx.compose.material.icons.filled.Call
-import androidx.compose.material.icons.filled.FilterList
-import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material.icons.automirrored.filled.CallMade
+import androidx.compose.material.icons.automirrored.filled.CallMissed
+import androidx.compose.material.icons.automirrored.filled.HelpOutline
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -30,15 +35,25 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.leadhunters.data.local.entities.Lead
+import com.example.leadhunters.data.local.entities.AppCallLog
 import com.example.leadhunters.service.CallService
+import com.example.leadhunters.ui.components.AppBadge
 import com.example.leadhunters.ui.theme.SuccessEmerald
+import com.example.leadhunters.ui.logs.PlaybackState
+import com.example.leadhunters.ui.components.CallStatusBadge
+import com.example.leadhunters.ui.components.formatDuration
+import com.example.leadhunters.ui.components.formatDurationMs
+import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LeadsScreen(
+    onOutcomeClick: (Long) -> Unit,
+    onWhatsAppClick: (String) -> Unit,
     viewModel: LeadsViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val playbackState by viewModel.playbackState.collectAsState()
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
 
@@ -94,17 +109,21 @@ fun LeadsScreen(
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    items(uiState.leads, key = { it.id }) { lead ->
+                    items(uiState.leads, key = { it.lead.id }) { leadWithLog ->
                         LeadItemCard(
-                            lead = lead,
+                            item = leadWithLog,
+                            playbackState = playbackState,
                             onCallClick = { 
                                 coroutineScope.launch {
-                                    viewModel.startCall(lead)
-                                    makeCall(context, lead) 
+                                    viewModel.startCall(leadWithLog.lead)
+                                    makeCall(context, leadWithLog.lead) 
                                 }
-                            }
+                            },
+                            onPlaybackToggle = { id, path -> viewModel.togglePlayback(id, path) },
+                            onOutcomeClick = { leadWithLog.latestLog?.id?.let { onOutcomeClick(it) } },
+                            onWhatsAppClick = { onWhatsAppClick(leadWithLog.lead.phoneNumber) }
                         )
                     }
                 }
@@ -151,10 +170,23 @@ fun BusinessOwnerFilterBar(
 }
 
 @Composable
-fun LeadItemCard(lead: Lead, onCallClick: () -> Unit) {
+fun LeadItemCard(
+    item: LeadWithLog,
+    playbackState: PlaybackState,
+    onCallClick: () -> Unit,
+    onPlaybackToggle: (Long, String) -> Unit,
+    onOutcomeClick: () -> Unit,
+    onWhatsAppClick: () -> Unit
+) {
+    val lead = item.lead
+    val latestLog = item.latestLog
+    val hasLog = latestLog != null
+    val hasRecording = latestLog?.recordingPath != null && File(latestLog.recordingPath!!).exists()
+    val isCurrentlyPlaying = playbackState.currentLogId == latestLog?.id && playbackState.isPlaying
+
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(24.dp), // More premium rounded corners
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
@@ -173,34 +205,32 @@ fun LeadItemCard(lead: Lead, onCallClick: () -> Unit) {
                         text = lead.name,
                         style = MaterialTheme.typography.titleLarge.copy(
                             fontWeight = FontWeight.ExtraBold,
-                            letterSpacing = 0.sp
+                            letterSpacing = (-0.5).sp
                         ),
                         color = MaterialTheme.colorScheme.onSurface
                     )
+                    
+                    if (item.isSyncing) {
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp)) {
+                            CircularProgressIndicator(modifier = Modifier.size(10.dp), strokeWidth = 1.dp)
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Syncing...", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                        }
+                    }
+
                     Spacer(modifier = Modifier.height(4.dp))
                     
-                    // Business Owner Badge
                     Surface(
-                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f),
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
                         shape = RoundedCornerShape(8.dp)
                     ) {
                         Row(
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(
-                                Icons.Default.Business,
-                                contentDescription = null,
-                                modifier = Modifier.size(12.dp),
-                                tint = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
+                            Icon(Icons.Default.Business, contentDescription = null, modifier = Modifier.size(12.dp), tint = MaterialTheme.colorScheme.primary)
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = lead.businessOwnerName,
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
+                            Text(text = lead.businessOwnerName, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
@@ -208,37 +238,155 @@ fun LeadItemCard(lead: Lead, onCallClick: () -> Unit) {
                 FilledIconButton(
                     onClick = onCallClick,
                     modifier = Modifier.size(56.dp),
-                    colors = IconButtonDefaults.filledIconButtonColors(
-                        containerColor = SuccessEmerald,
-                        contentColor = Color.White
-                    )
+                    colors = IconButtonDefaults.filledIconButtonColors(containerColor = SuccessEmerald, contentColor = Color.White)
                 ) {
                     Icon(Icons.Default.Call, contentDescription = "Call Now")
                 }
             }
 
             Spacer(modifier = Modifier.height(12.dp))
-            Divider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-            Spacer(modifier = Modifier.height(12.dp))
-
+            
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    Icons.Default.Phone,
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Icon(Icons.Default.Phone, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = lead.phoneNumber,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontWeight = FontWeight.Medium
-                )
+                Text(text = lead.phoneNumber, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Medium)
+            }
+
+            // Enhanced Call Log Section - Only visible if a call has happened
+            AnimatedVisibility(
+                visible = hasLog,
+                enter = expandVertically(),
+                exit = shrinkVertically()
+            ) {
+                Column {
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp), thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                    
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Schedule, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(text = formatDuration(latestLog?.duration?.toLong() ?: 0L), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                        }
+                        
+                        latestLog?.status?.let { status ->
+                            CallStatusBadge(status = item.latestOutcome?.outcomeType ?: status)
+                        }
+                    }
+
+                    item.latestOutcome?.remarks?.let { remarks ->
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Surface(
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.Top) {
+                                Icon(Icons.Default.Notes, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = remarks,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Action Buttons Row
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        // Playback Button
+                        Button(
+                            onClick = { latestLog?.id?.let { onPlaybackToggle(it, latestLog.recordingPath!!) } },
+                            modifier = Modifier.weight(1f),
+                            enabled = hasRecording,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = when {
+                                    !hasRecording -> MaterialTheme.colorScheme.surfaceVariant
+                                    isCurrentlyPlaying -> MaterialTheme.colorScheme.errorContainer
+                                    else -> MaterialTheme.colorScheme.tertiaryContainer
+                                },
+                                contentColor = when {
+                                    !hasRecording -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+                                    isCurrentlyPlaying -> MaterialTheme.colorScheme.onErrorContainer
+                                    else -> MaterialTheme.colorScheme.onTertiaryContainer
+                                }
+                            ),
+                            shape = RoundedCornerShape(12.dp),
+                            contentPadding = PaddingValues(0.dp)
+                        ) {
+                            Icon(
+                                imageVector = when {
+                                    !hasRecording -> Icons.Default.MicOff
+                                    isCurrentlyPlaying -> Icons.Default.Pause
+                                    else -> Icons.Default.PlayArrow
+                                },
+                                contentDescription = null,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+
+                        // Outcome Button
+                        Button(
+                            onClick = onOutcomeClick,
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primaryContainer, contentColor = MaterialTheme.colorScheme.onPrimaryContainer),
+                            shape = RoundedCornerShape(12.dp),
+                            contentPadding = PaddingValues(0.dp)
+                        ) {
+                            Icon(Icons.Default.Assignment, contentDescription = null, modifier = Modifier.size(20.dp))
+                        }
+
+                        // WhatsApp Button
+                        Button(
+                            onClick = onWhatsAppClick,
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondaryContainer, contentColor = MaterialTheme.colorScheme.onSecondaryContainer),
+                            shape = RoundedCornerShape(12.dp),
+                            contentPadding = PaddingValues(0.dp)
+                        ) {
+                            Icon(Icons.Default.Chat, contentDescription = null, modifier = Modifier.size(20.dp))
+                        }
+                    }
+
+                    // Playback Progress
+                    AnimatedVisibility(visible = isCurrentlyPlaying) {
+                        Column(modifier = Modifier.fillMaxWidth().padding(top = 12.dp)) {
+                            val progress = if (playbackState.duration > 0) {
+                                playbackState.currentPosition.toFloat() / playbackState.duration
+                            } else 0f
+                            
+                            LinearProgressIndicator(
+                                progress = { progress },
+                                modifier = Modifier.fillMaxWidth().height(4.dp).clip(CircleShape),
+                                color = MaterialTheme.colorScheme.primary,
+                                trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+                            )
+                            
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(text = formatDurationMs(playbackState.currentPosition), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                                Text(text = formatDurationMs(playbackState.duration), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
+                }
             }
         }
     }
 }
+
+// Removed local formatDuration and formatDurationMs as they are now in CallLogComponents.kt
 
 private fun makeCall(context: Context, lead: Lead) {
     // Defensively start the tracking service
