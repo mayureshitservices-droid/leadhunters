@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.Flow
 
 interface CallRepository {
     fun getLeads(): Flow<List<Lead>>
+    suspend fun getLeadById(id: String): Lead?
     suspend fun insertLead(lead: Lead)
     fun getCallLogs(): Flow<List<AppCallLog>>
     suspend fun startCall(leadId: String?, phoneNumber: String): Long

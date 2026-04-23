@@ -22,6 +22,8 @@ class CallRepositoryImpl @Inject constructor(
 
     override fun getLeads(): Flow<List<Lead>> = teleCallerDao.getAllLeads()
 
+    override suspend fun getLeadById(id: String): Lead? = teleCallerDao.getLeadById(id)
+
     override suspend fun insertLead(lead: Lead) {
         teleCallerDao.insertLead(lead)
     }

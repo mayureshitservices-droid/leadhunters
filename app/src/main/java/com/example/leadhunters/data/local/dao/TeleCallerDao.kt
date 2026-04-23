@@ -15,6 +15,9 @@ interface TeleCallerDao {
     @Query("SELECT * FROM leads")
     fun getAllLeads(): Flow<List<Lead>>
 
+    @Query("SELECT * FROM leads WHERE id = :id")
+    suspend fun getLeadById(id: String): Lead?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertLead(lead: Lead)
 

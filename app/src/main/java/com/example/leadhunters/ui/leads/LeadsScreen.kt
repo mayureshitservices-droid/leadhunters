@@ -277,21 +277,37 @@ fun LeadItemCard(
                         }
                     }
 
-                    item.latestOutcome?.remarks?.let { remarks ->
+                    item.latestOutcome?.let { outcome ->
                         Spacer(modifier = Modifier.height(8.dp))
                         Surface(
                             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
                             shape = RoundedCornerShape(12.dp),
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.Top) {
-                                Icon(Icons.Default.Notes, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = remarks,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.Person, contentDescription = null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.primary)
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = outcome.customerName,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+                                
+                                if (!outcome.remarks.isNullOrBlank()) {
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Row(verticalAlignment = Alignment.Top) {
+                                        Icon(Icons.Default.Notes, contentDescription = null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = outcome.remarks,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
                             }
                         }
                     }

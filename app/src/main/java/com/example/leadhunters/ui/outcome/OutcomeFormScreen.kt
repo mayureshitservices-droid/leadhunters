@@ -127,7 +127,12 @@ fun OutcomeForm(
             modifier = Modifier.fillMaxWidth(),
             leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
             singleLine = true,
-            isError = customerName.isBlank()
+            isError = customerName.isBlank(),
+            colors = OutlinedTextFieldDefaults.colors(
+                unfocusedBorderColor = com.example.leadhunters.ui.theme.PrimaryRed,
+                focusedBorderColor = com.example.leadhunters.ui.theme.PrimaryRed,
+                errorBorderColor = com.example.leadhunters.ui.theme.PrimaryRed
+            )
         )
 
         ExposedDropdownMenuBox(
@@ -141,7 +146,12 @@ fun OutcomeForm(
                 readOnly = true,
                 label = { Text("Outcome") },
                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-                modifier = Modifier.menuAnchor().fillMaxWidth()
+                modifier = Modifier.menuAnchor().fillMaxWidth(),
+                isError = false, // Always valid as it has a default
+                colors = OutlinedTextFieldDefaults.colors(
+                    unfocusedBorderColor = com.example.leadhunters.ui.theme.PrimaryRed,
+                    focusedBorderColor = com.example.leadhunters.ui.theme.PrimaryRed
+                )
             )
             ExposedDropdownMenu(
                 expanded = expanded,
@@ -167,7 +177,12 @@ fun OutcomeForm(
                 modifier = Modifier.fillMaxWidth(),
                 minLines = 3,
                 isError = !isReminder && remarks.isBlank(),
-                placeholder = { Text("Enter call details...") }
+                placeholder = { Text("Enter call details...") },
+                colors = OutlinedTextFieldDefaults.colors(
+                    unfocusedBorderColor = com.example.leadhunters.ui.theme.PrimaryRed,
+                    focusedBorderColor = com.example.leadhunters.ui.theme.PrimaryRed,
+                    errorBorderColor = com.example.leadhunters.ui.theme.PrimaryRed
+                )
             )
         }
 

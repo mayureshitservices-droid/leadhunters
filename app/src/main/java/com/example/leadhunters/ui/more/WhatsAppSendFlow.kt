@@ -34,6 +34,10 @@ fun WhatsAppSendFlow(
     val logs by logsViewModel.callLogs.collectAsState()
     val context = LocalContext.current
 
+    LaunchedEffect(Unit) {
+        templateViewModel.seedInitialTemplatesIfEmpty()
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -134,7 +138,13 @@ fun WhatsAppSendFlow(
 }
 
 private fun sendWhatsApp(context: android.content.Context, phoneNumber: String, message: String) {
-    val url = "https://api.whatsapp.com/send?phone=$phoneNumber&text=${Uri.encode(message)}"
+    // 1. Strip all non-numeric characters
+    val cleanNumber = phoneNumber.replace(Regex("[^0-9]"), "")
+    
+    // 2. Add default country code if it's 10 digits
+    val finalNumber = if (cleanNumber.length == 10) "91$cleanNumber" else cleanNumber
+    
+    val url = "https://api.whatsapp.com/send?phone=$finalNumber&text=${Uri.encode(message)}"
     val intent = Intent(Intent.ACTION_VIEW).apply {
         data = Uri.parse(url)
         `package` = "com.whatsapp"

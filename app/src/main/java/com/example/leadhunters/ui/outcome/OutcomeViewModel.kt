@@ -29,11 +29,12 @@ class OutcomeViewModel @Inject constructor(
         viewModelScope.launch {
             val log = repository.getLogById(callLogId)
             if (log != null) {
+                val lead = repository.getLeadById(log.leadId)
                 _uiState.value = OutcomeUiState.Form(
                     callId = log.id,
                     leadId = log.leadId,
                     phoneNumber = log.phoneNumber,
-                    customerName = ""
+                    customerName = lead?.name ?: ""
                 )
             }
         }
