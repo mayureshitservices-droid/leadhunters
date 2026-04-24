@@ -16,9 +16,11 @@ data class LeadDto(
 )
 
 data class CallLogSyncRequest(
+    @SerializedName("local_log_id") val localLogId: Long,
     @SerializedName("lead_id") val leadId: String,
     @SerializedName("duration_seconds") val durationSeconds: Int,
-    @SerializedName("status") val status: String,
+    @SerializedName("call_status") val callStatus: String,
+    @SerializedName("outcome") val outcome: String? = null,
     @SerializedName("notes") val notes: String? = null
 )
 

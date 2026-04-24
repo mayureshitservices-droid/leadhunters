@@ -45,16 +45,20 @@ class WorkRepositoryImpl @Inject constructor(
     }
 
     override suspend fun syncCallLog(
+        localLogId: Long,
         leadId: String,
         durationSeconds: Int,
-        status: String,
+        callStatus: String,
+        outcome: String?,
         notes: String?
     ): Result<Unit> {
         return try {
             val request = CallLogSyncRequest(
+                localLogId = localLogId,
                 leadId = leadId,
                 durationSeconds = durationSeconds,
-                status = status,
+                callStatus = callStatus,
+                outcome = outcome,
                 notes = notes
             )
             val response = apiService.syncCallLog(request)

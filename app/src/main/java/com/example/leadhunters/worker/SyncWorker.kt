@@ -50,9 +50,11 @@ class SyncWorker @AssistedInject constructor(
                 if (callLog != null) {
                     val outcome = teleCallerDao.getOutcomeForCall(callLog.id)
                     val syncResult = workRepository.syncCallLog(
+                        localLogId = callLog.id,
                         leadId = callLog.leadId,
                         durationSeconds = callLog.duration?.toInt() ?: 0,
-                        status = outcome?.outcomeType ?: callLog.status,
+                        callStatus = callLog.status,
+                        outcome = outcome?.outcomeType,
                         notes = outcome?.remarks
                     )
                     syncResult.isSuccess
