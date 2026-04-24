@@ -24,6 +24,7 @@ import com.example.leadhunters.ui.theme.LeadHuntersTheme
 import com.example.leadhunters.ui.dashboard.DashboardScreen
 import com.example.leadhunters.ui.leads.LeadsScreen
 import com.example.leadhunters.ui.logs.CallLogsScreen
+import com.example.leadhunters.ui.completedleads.CompletedLeadsScreen
 import com.example.leadhunters.ui.reminders.RemindersScreen
 import com.example.leadhunters.ui.more.MoreScreen
 import com.example.leadhunters.ui.more.TemplateManagementScreen
@@ -60,7 +61,8 @@ fun MainScreen() {
         bottomBar = {
             if (currentDestination != null && 
                 !currentDestination.startsWith("outcome/") && 
-                currentDestination != "initialization") {
+                currentDestination != "initialization" &&
+                currentDestination != "dial") {
                 NavigationBar(
                     containerColor = MaterialTheme.colorScheme.background,
                     tonalElevation = 8.dp
@@ -114,9 +116,14 @@ fun MainScreen() {
                 )
             }
             composable(AppDestinations.LOGS.route) {
+                CompletedLeadsScreen(
+                    onWhatsAppClick = { number -> navController.navigate("send_template/$number") }
+                )
+            }
+            composable("dial") {
                 CallLogsScreen(
                     onOutcomeClick = { callId -> navController.navigate("outcome/$callId") },
-                    onWhatsAppClick = { number -> navController.navigate("send_template/$number") } 
+                    onWhatsAppClick = { number -> navController.navigate("send_template/$number") }
                 )
             }
             composable(
@@ -163,7 +170,7 @@ enum class AppDestinations(
 ) {
     DASHBOARD("Dashboard", Icons.Default.Dashboard, "dashboard"),
     LEADS("My Leads", Icons.Default.ContactPhone, "leads"),
-    LOGS("Logs", Icons.Default.List, "logs"),
+    LOGS("Logs", Icons.Default.History, "completed_leads"),
     REMINDERS("Reminders", Icons.Default.Notifications, "reminders"),
     MORE("More", Icons.Default.Menu, "more")
 }

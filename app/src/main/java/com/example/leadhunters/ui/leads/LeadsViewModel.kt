@@ -24,7 +24,8 @@ data class LeadWithLog(
     val lead: com.example.leadhunters.data.local.entities.Lead,
     val latestLog: com.example.leadhunters.data.local.entities.AppCallLog?,
     val latestOutcome: com.example.leadhunters.data.local.entities.CallOutcome? = null,
-    val isSyncing: Boolean = false
+    val isSyncing: Boolean = false,
+    val hasAnyOutcome: Boolean = false
 )
 
 data class BusinessOwnerFilter(
@@ -71,19 +72,18 @@ class LeadsViewModel @Inject constructor(
         }
 
         val leadsWithLogs = filteredLeads.map { lead ->
-            val latestLog = logs.filter { it.leadId == lead.id || (it.leadId == "AD_HOC" && it.phoneNumber == lead.phoneNumber) }
-                .maxByOrNull { it.startTime }
+            val leadLogs = logs.filter { it.leadId == lead.id || (it.leadId == "AD_HOC" && it.phoneNumber == lead.phoneNumber) }
+            val latestLog = leadLogs.maxByOrNull { it.startTime }
             
-            val latestOutcome = latestLog?.let { log ->
-                outcomes.find { it.callLogId == log.id }
-            }
+            val hasAnyOutcome = leadLogs.any { log -> outcomes.any { it.callLogId == log.id } }
+            val latestOutcome = latestLog?.let { log -> outcomes.find { it.callLogId == log.id } }
             
             val isSyncing = latestLog?.let { log ->
                 syncItems.any { it.type == "CALL_LOG" && it.referenceId == log.id.toString() && it.status == "PENDING" }
             } ?: false
             
-            LeadWithLog(lead, latestLog, latestOutcome, isSyncing)
-        }
+            LeadWithLog(lead, latestLog, latestOutcome, isSyncing, hasAnyOutcome)
+        }.filter { !it.hasAnyOutcome } // My Leads: only show leads that have NO outcome submitted yet
 
         val owners = leads.map { BusinessOwnerFilter(it.businessOwnerId, it.businessOwnerName) }
             .distinctBy { it.id }

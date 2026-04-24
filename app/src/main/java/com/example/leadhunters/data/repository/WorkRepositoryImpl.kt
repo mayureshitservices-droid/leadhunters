@@ -33,7 +33,6 @@ class WorkRepositoryImpl @Inject constructor(
                         businessOwnerName = dto.businessOwnerName
                     )
                 }
-                teleCallerDao.clearLeads()
                 teleCallerDao.insertLeads(entities)
                 Result.success(Unit)
             } else {

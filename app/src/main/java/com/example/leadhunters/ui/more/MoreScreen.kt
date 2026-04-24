@@ -34,6 +34,14 @@ fun MoreScreen(navController: NavController) {
         ) {
             item {
                 MoreItem(
+                    icon = Icons.Default.Dialpad,
+                    title = "Dial",
+                    subtitle = "Open the dial pad to make a call",
+                    onClick = { navController.navigate("dial") }
+                )
+            }
+            item {
+                MoreItem(
                     icon = Icons.Default.Campaign,
                     title = "Campaigns",
                     subtitle = "Manage your calling campaigns",
