@@ -13,5 +13,10 @@ interface WorkRepository {
         callStatus: String,
         outcome: String? = null,
         notes: String? = null
+    ): Result<String?> // Return server log ID
+
+    suspend fun uploadRecording(
+        serverLogId: String,
+        recordingPath: String
     ): Result<Unit>
 }

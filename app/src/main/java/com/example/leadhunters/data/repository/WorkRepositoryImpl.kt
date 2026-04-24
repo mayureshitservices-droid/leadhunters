@@ -6,6 +6,10 @@ import com.example.leadhunters.data.remote.api.WorkApiService
 import com.example.leadhunters.data.remote.model.CallLogSyncRequest
 import com.example.leadhunters.util.AnalyticsHelper
 import kotlinx.coroutines.flow.Flow
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.MultipartBody
+import okhttp3.RequestBody.Companion.asRequestBody
+import okhttp3.RequestBody.Companion.toRequestBody
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -50,7 +54,7 @@ class WorkRepositoryImpl @Inject constructor(
         callStatus: String,
         outcome: String?,
         notes: String?
-    ): Result<Unit> {
+    ): Result<String?> {
         return try {
             val request = CallLogSyncRequest(
                 localLogId = localLogId,
@@ -63,7 +67,7 @@ class WorkRepositoryImpl @Inject constructor(
             val response = apiService.syncCallLog(request)
             if (response.isSuccessful) {
                 analyticsHelper.logApiSyncResult(leadId, response.code(), true, null)
-                Result.success(Unit)
+                Result.success(response.body()?.logId)
             } else {
                 val errorBody = response.errorBody()?.string() ?: response.message()
                 analyticsHelper.logApiSyncResult(leadId, response.code(), false, errorBody)
@@ -71,6 +75,29 @@ class WorkRepositoryImpl @Inject constructor(
             }
         } catch (e: Exception) {
             analyticsHelper.logApiSyncResult(leadId, -1, false, e.message)
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun uploadRecording(
+        serverLogId: String,
+        recordingPath: String
+    ): Result<Unit> {
+        return try {
+            val file = java.io.File(recordingPath)
+            if (!file.exists()) return Result.failure(Exception("Recording file not found"))
+
+            val requestFile = file.asRequestBody("audio/*".toMediaTypeOrNull())
+            val body = MultipartBody.Part.createFormData("recording", file.name, requestFile)
+            val logIdBody = serverLogId.toRequestBody("text/plain".toMediaTypeOrNull())
+
+            val response = apiService.uploadRecording(logIdBody, body)
+            if (response.isSuccessful) {
+                Result.success(Unit)
+            } else {
+                Result.failure(Exception("Failed to upload recording: ${response.message()}"))
+            }
+        } catch (e: Exception) {
             Result.failure(e)
         }
     }

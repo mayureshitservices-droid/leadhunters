@@ -16,4 +16,11 @@ interface WorkApiService {
     suspend fun syncCallLog(
         @Body request: CallLogSyncRequest
     ): Response<SyncResponse>
+
+    @retrofit2.http.Multipart
+    @POST("/api/v1/sync/recording")
+    suspend fun uploadRecording(
+        @retrofit2.http.Part("log_id") logId: okhttp3.RequestBody,
+        @retrofit2.http.Part recording: okhttp3.MultipartBody.Part
+    ): Response<SyncResponse>
 }

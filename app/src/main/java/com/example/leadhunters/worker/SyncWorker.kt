@@ -57,7 +57,22 @@ class SyncWorker @AssistedInject constructor(
                         outcome = outcome?.outcomeType,
                         notes = outcome?.remarks
                     )
-                    syncResult.isSuccess
+                    
+                    if (syncResult.isSuccess) {
+                        val serverLogId = syncResult.getOrNull()
+                        if (serverLogId != null && !callLog.recordingPath.isNullOrEmpty()) {
+                            // If we have a recording and a server ID, upload it
+                            val recordingResult = workRepository.uploadRecording(
+                                serverLogId = serverLogId,
+                                recordingPath = callLog.recordingPath
+                            )
+                            recordingResult.isSuccess
+                        } else {
+                            true // No recording or no server ID (but sync was success)
+                        }
+                    } else {
+                        false
+                    }
                 } else {
                     true // Item gone, consider it "synced" to clear queue
                 }
