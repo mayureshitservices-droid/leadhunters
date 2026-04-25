@@ -1,6 +1,7 @@
 package com.example.leadhunters.worker
 
 import android.content.Context
+import android.util.Log
 import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
@@ -9,6 +10,13 @@ import com.example.leadhunters.data.local.entities.SyncItem
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import kotlinx.coroutines.flow.first
+import android.widget.Toast
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import androidx.core.app.NotificationCompat
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.os.Build
 
 @HiltWorker
 class SyncWorker @AssistedInject constructor(
@@ -20,7 +28,9 @@ class SyncWorker @AssistedInject constructor(
 ) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
+        // Now also checking for FAILED items that haven't reached max retries
         val pendingItems = teleCallerDao.getPendingSyncItems().first()
+            .filter { it.status == "PENDING" || (it.status == "FAILED" && it.retryCount < 5) }
         
         if (pendingItems.isEmpty()) return Result.success()
 
@@ -43,6 +53,26 @@ class SyncWorker @AssistedInject constructor(
         return if (successCount == pendingItems.size) Result.success() else Result.retry()
     }
 
+    private fun showErrorNotification(title: String, message: String) {
+        val channelId = "sync_errors"
+        val notificationManager = applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(channelId, "Sync Errors", NotificationManager.IMPORTANCE_HIGH)
+            notificationManager.createNotificationChannel(channel)
+        }
+
+        val notification = NotificationCompat.Builder(applicationContext, channelId)
+            .setSmallIcon(android.R.drawable.stat_notify_error)
+            .setContentTitle(title)
+            .setContentText(message)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setAutoCancel(true)
+            .build()
+
+        notificationManager.notify(System.currentTimeMillis().toInt(), notification)
+    }
+
     private suspend fun processSyncItem(item: SyncItem): Boolean {
         return when (item.type) {
             "CALL_LOG" -> {
@@ -50,7 +80,7 @@ class SyncWorker @AssistedInject constructor(
                 if (callLog != null) {
                     val outcome = teleCallerDao.getOutcomeForCall(callLog.id)
                     val syncResult = workRepository.syncCallLog(
-                        localLogId = callLog.id,
+                        localLogId = "${callLog.id}_${callLog.startTime}",
                         leadId = callLog.leadId,
                         durationSeconds = callLog.duration?.toInt() ?: 0,
                         callStatus = callLog.status,
@@ -60,17 +90,35 @@ class SyncWorker @AssistedInject constructor(
                     
                     if (syncResult.isSuccess) {
                         val serverLogId = syncResult.getOrNull()
+                        Log.i("SyncWorker", "Call log metadata synced. Server ID: $serverLogId")
+                        
                         if (serverLogId != null && !callLog.recordingPath.isNullOrEmpty()) {
-                            // If we have a recording and a server ID, upload it
                             val recordingResult = workRepository.uploadRecording(
                                 serverLogId = serverLogId,
                                 recordingPath = callLog.recordingPath
                             )
+                            if (!recordingResult.isSuccess) {
+                                val error = recordingResult.exceptionOrNull()?.message ?: "Unknown Error"
+                                withContext(Dispatchers.Main) {
+                                    Toast.makeText(applicationContext, "Upload Failed: $error", Toast.LENGTH_LONG).show()
+                                }
+                                showErrorNotification("Recording Upload Failed", error)
+                                Log.e("SyncWorker", "Recording upload FAILED for server log $serverLogId: $error")
+                            } else {
+                                Log.i("SyncWorker", "Recording upload SUCCESS for server log $serverLogId")
+                            }
                             recordingResult.isSuccess
                         } else {
-                            true // No recording or no server ID (but sync was success)
+                            if (serverLogId == null) Log.w("SyncWorker", "Sync succeeded but no server ID returned!")
+                            true 
                         }
                     } else {
+                        val error = syncResult.exceptionOrNull()?.message ?: "Unknown Error"
+                        withContext(Dispatchers.Main) {
+                            Toast.makeText(applicationContext, "Sync Failed: $error", Toast.LENGTH_LONG).show()
+                        }
+                        showErrorNotification("Call Sync Failed", error)
+                        Log.e("SyncWorker", "Call log metadata sync FAILED: $error")
                         false
                     }
                 } else {

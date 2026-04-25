@@ -44,6 +44,7 @@ class CallService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        Log.d("CallService", "onStartCommand action: ${intent?.action} | Phone: ${intent?.getStringExtra(EXTRA_PHONE_NUMBER)}")
         when (intent?.action) {
             ACTION_START_TRACKING -> {
                 val phoneNumber = intent.getStringExtra(EXTRA_PHONE_NUMBER) ?: ""

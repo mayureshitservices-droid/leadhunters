@@ -3,6 +3,7 @@ package com.example.leadhunters.ui.leads
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.util.Log
 import android.Manifest
 import android.content.pm.PackageManager
 import androidx.compose.animation.AnimatedVisibility
@@ -413,9 +414,11 @@ private fun makeCall(context: Context, lead: Lead) {
     }
     
     try {
+        val phoneToLog = lead.phoneNumber
+        Log.d("LeadsScreen", "Starting CallService for: $phoneToLog")
         ContextCompat.startForegroundService(context, serviceIntent)
     } catch (e: Exception) {
-        // Log block
+        Log.e("LeadsScreen", "Error starting CallService", e)
     }
 
     val phoneNumber = lead.phoneNumber

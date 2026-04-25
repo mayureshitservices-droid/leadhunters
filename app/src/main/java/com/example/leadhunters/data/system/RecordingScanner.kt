@@ -15,9 +15,9 @@ class RecordingScanner @Inject constructor(
 ) {
 
     private val oemPaths = listOf(
-        "/MIUI/sound_recorder/call_rec/", // Xiaomi
         "/Recordings/Call/",             // Samsung/Standard
-        "/Recordings/",                 // Generic Standard
+        "/Recordings/sound_recorder/call_rec/", // New Xiaomi path
+        "/MIUI/sound_recorder/call_rec/", // Older Xiaomi path
         "/Download/",                   // Some older apps save here
         "/Record/Call/",                 // Realme/OPPO
         "/Music/Recordings/Call/",       // Alternative Realme/OPPO/OnePlus
@@ -47,12 +47,14 @@ class RecordingScanner @Inject constructor(
         
         for (path in oemPaths) {
             val dir = File(root, path)
+            Log.i("RecordingScanner", "Checking directory: ${dir.absolutePath} (Exists: ${dir.exists()})")
             if (dir.exists() && dir.isDirectory) {
                 val files = dir.listFiles { file ->
                     val name = file.name.lowercase(Locale.ROOT)
                     file.isFile && (name.endsWith(".mp3") || name.endsWith(".aac") || name.endsWith(".m4a") || name.endsWith(".wav"))
                 }
                 
+                Log.i("RecordingScanner", "Found ${files?.size ?: 0} audio files in ${dir.name}")
                 files?.sortByDescending { it.lastModified() }
                 
                 val found = files?.find { file ->
@@ -64,14 +66,17 @@ class RecordingScanner @Inject constructor(
                     val containsNumber = fileNameLower.contains(normalizedNumber) || 
                                          (normalizedNumber.length > 5 && fileNameLower.contains(normalizedNumber.takeLast(5)))
 
+                    Log.i("RecordingScanner", "Evaluating file: ${file.name} | TimeDiff: ${timeDiff/1000}s | MatchNumber: $containsNumber")
                     isRecent && containsNumber
                 }
                 
                 if (found != null) {
+                    Log.i("RecordingScanner", "MATCH FOUND: ${found.absolutePath}")
                     return found.absolutePath
                 }
             }
         }
+        Log.w("RecordingScanner", "No recording found in raw paths for $phoneNumber")
         return null
     }
 
@@ -105,7 +110,7 @@ class RecordingScanner @Inject constructor(
                     
                     if (name.contains(normalizedNumber) || 
                         (normalizedNumber.length > 5 && name.contains(normalizedNumber.takeLast(5)))) {
-                        Log.d("RecordingScanner", "MediaStore found recording: $path")
+                        Log.i("RecordingScanner", "MediaStore found recording: $path")
                         return path
                     }
                 }

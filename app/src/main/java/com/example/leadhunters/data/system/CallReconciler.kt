@@ -30,7 +30,7 @@ class CallReconciler @Inject constructor(
                 return
             }
             
-            Log.d("CallReconciler", "Attempting reconcile for ${pendingLogs.size} logs for $phoneNumber")
+            Log.i("CallReconciler", "Attempting reconcile for ${pendingLogs.size} logs for $phoneNumber")
             
             for (pendingLog in pendingLogs) {
                 try {
@@ -75,7 +75,8 @@ class CallReconciler @Inject constructor(
                                 else -> "ENDED"
                             }
 
-                            // Scan for recording
+                            // 1. Scan for recording
+                            Log.i("CallReconciler", "Scanning for recording of call at $date with $phoneNumber")
                             val recordingPath = try {
                                 recordingScanner.findRecordingForCall(phoneNumber, date)
                             } catch (e: Exception) {
@@ -83,6 +84,7 @@ class CallReconciler @Inject constructor(
                                 null
                             }
 
+                            // 2. Save duration/status
                             repository.finalizeCall(
                                 callLogId = pendingLog.id,
                                 duration = duration,
@@ -90,7 +92,18 @@ class CallReconciler @Inject constructor(
                                 systemCallLogId = systemId
                             )
 
-                            // If we have a leadId from context but not in the log, update it
+                            // 3. Update with recording path IMMEDIATELY if found
+                            if (recordingPath != null) {
+                                Log.i("CallReconciler", "Updating log ${pendingLog.id} with recording: $recordingPath")
+                                val currentLog = repository.getLogById(pendingLog.id)
+                                if (currentLog != null) {
+                                    repository.updateLog(currentLog.copy(recordingPath = recordingPath))
+                                }
+                            } else {
+                                Log.w("CallReconciler", "No recording found for call with $phoneNumber at $date")
+                            }
+
+                            // 4. Update leadId if needed
                             if (pendingLog.leadId == "AD_HOC" && leadId != null) {
                                 val currentLog = repository.getLogById(pendingLog.id)
                                 if (currentLog != null) {
@@ -98,31 +111,24 @@ class CallReconciler @Inject constructor(
                                 }
                             }
 
-                            // Enqueue Sync
+                            // 5. Finally Enqueue Sync (Recording path is now definitely in DB)
+                            Log.i("CallReconciler", "Enqueuing sync for log ${pendingLog.id}")
                             repository.enqueueSync(
                                 com.example.leadhunters.data.local.entities.SyncItem(
                                     type = "CALL_LOG",
                                     referenceId = pendingLog.id.toString(),
                                     operation = "CREATE",
-                                    payload = "" // SyncWorker will fetch the data
+                                    payload = "" 
                                 )
                             )
                             
-                            // Update with recording if found
-                            if (recordingPath != null) {
-                                val updatedLog = repository.getLogById(pendingLog.id)
-                                if (updatedLog != null) {
-                                    repository.updateLog(updatedLog.copy(recordingPath = recordingPath))
-                                }
-                            }
-                            
-                            Log.d("CallReconciler", "Reconciled log ${pendingLog.id} with system ID $systemId")
+                            Log.i("CallReconciler", "Successfully reconciled log ${pendingLog.id} with system ID $systemId")
                             analyticsHelper.logReconciliation(phoneNumber, true, "Matched system ID $systemId")
                             break // Stop after first match
                         }
                         
                         if (!matched) {
-                            Log.d("CallReconciler", "No matching call found in system log for $phoneNumber")
+                            Log.i("CallReconciler", "No matching call found in system log for $phoneNumber")
                             analyticsHelper.logReconciliation(phoneNumber, false, "No matching number in recent calls")
                         }
                     }

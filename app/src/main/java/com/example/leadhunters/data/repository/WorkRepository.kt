@@ -7,7 +7,7 @@ interface WorkRepository {
     fun getLeads(): Flow<List<Lead>>
     suspend fun syncLeads(): Result<Unit>
     suspend fun syncCallLog(
-        localLogId: Long,
+        localLogId: String,
         leadId: String,
         durationSeconds: Int,
         callStatus: String,

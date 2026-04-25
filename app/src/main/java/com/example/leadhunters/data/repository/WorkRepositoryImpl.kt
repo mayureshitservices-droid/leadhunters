@@ -1,6 +1,7 @@
 package com.example.leadhunters.data.repository
 
 import com.example.leadhunters.data.local.dao.TeleCallerDao
+import android.util.Log
 import com.example.leadhunters.data.local.entities.Lead
 import com.example.leadhunters.data.remote.api.WorkApiService
 import com.example.leadhunters.data.remote.model.CallLogSyncRequest
@@ -48,7 +49,7 @@ class WorkRepositoryImpl @Inject constructor(
     }
 
     override suspend fun syncCallLog(
-        localLogId: Long,
+        localLogId: String,
         leadId: String,
         durationSeconds: Int,
         callStatus: String,
@@ -85,7 +86,17 @@ class WorkRepositoryImpl @Inject constructor(
     ): Result<Unit> {
         return try {
             val file = java.io.File(recordingPath)
-            if (!file.exists()) return Result.failure(Exception("Recording file not found"))
+            if (!file.exists()) {
+                Log.e("WorkRepository", "Recording file NOT FOUND at: $recordingPath")
+                return Result.failure(Exception("Recording file not found"))
+            }
+
+            if (!file.canRead()) {
+                Log.e("WorkRepository", "Recording file NOT READABLE at: $recordingPath (Check permissions!)")
+                return Result.failure(Exception("Recording file not readable"))
+            }
+
+            Log.i("WorkRepository", "Preparing to upload file: ${file.name} (${file.length()} bytes)")
 
             val requestFile = file.asRequestBody("audio/*".toMediaTypeOrNull())
             val body = MultipartBody.Part.createFormData("recording", file.name, requestFile)
@@ -93,11 +104,15 @@ class WorkRepositoryImpl @Inject constructor(
 
             val response = apiService.uploadRecording(logIdBody, body)
             if (response.isSuccessful) {
+                Log.i("WorkRepository", "Recording uploaded successfully for log $serverLogId")
                 Result.success(Unit)
             } else {
-                Result.failure(Exception("Failed to upload recording: ${response.message()}"))
+                val errorMsg = response.errorBody()?.string() ?: response.message()
+                Log.e("WorkRepository", "FAILED to upload recording. Code: ${response.code()} | Error: $errorMsg")
+                Result.failure(Exception("Failed to upload recording: $errorMsg"))
             }
         } catch (e: Exception) {
+            Log.e("WorkRepository", "CRITICAL ERROR during recording upload: ${e.message}", e)
             Result.failure(e)
         }
     }
