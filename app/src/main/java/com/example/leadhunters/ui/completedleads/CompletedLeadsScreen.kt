@@ -100,7 +100,8 @@ class CompletedLeadsViewModel @Inject constructor(
             } ?: false
 
             LeadWithLog(lead, latestLogWithOutcome, outcome, isSyncing)
-        }.filter { it.latestOutcome != null } 
+        }.filter { it.latestOutcome != null }
+         .sortedByDescending { it.latestLog?.startTime ?: 0L }
 
         val owners = leads.map { BusinessOwnerFilter(it.businessOwnerId, it.businessOwnerName) }
             .distinctBy { it.id }
