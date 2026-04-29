@@ -51,10 +51,12 @@ class RecordingScanner @Inject constructor(
             if (dir.exists() && dir.isDirectory) {
                 val files = dir.listFiles { file ->
                     val name = file.name.lowercase(Locale.ROOT)
-                    file.isFile && (name.endsWith(".mp3") || name.endsWith(".aac") || name.endsWith(".m4a") || name.endsWith(".wav"))
+                    file.isFile && (name.endsWith(".mp3") || name.endsWith(".aac") || 
+                                   name.endsWith(".m4a") || name.endsWith(".wav") || 
+                                   name.endsWith(".amr") || name.endsWith(".3gp"))
                 }
                 
-                Log.i("RecordingScanner", "Found ${files?.size ?: 0} audio files in ${dir.name}")
+                Log.i("RecordingScanner", "Found ${files?.size ?: 0} audio files in ${dir.absolutePath}")
                 files?.sortByDescending { it.lastModified() }
                 
                 val found = files?.find { file ->
