@@ -50,6 +50,10 @@ class SyncWorker @AssistedInject constructor(
             }
         }
 
+        if (successCount > 0) {
+            teleCallerDao.purgeCompletedSyncItems()
+        }
+
         return if (successCount == pendingItems.size) Result.success() else Result.retry()
     }
 

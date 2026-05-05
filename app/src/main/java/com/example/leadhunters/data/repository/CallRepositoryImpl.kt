@@ -28,7 +28,7 @@ class CallRepositoryImpl @Inject constructor(
         teleCallerDao.insertLead(lead)
     }
 
-    override fun getCallLogs(): Flow<List<AppCallLog>> = teleCallerDao.getAllCallLogs()
+    override fun getCallLogs(cutoffTime: Long): Flow<List<AppCallLog>> = teleCallerDao.getAllCallLogs(cutoffTime)
 
     override suspend fun startCall(leadId: String?, phoneNumber: String): Long {
         val log = AppCallLog(

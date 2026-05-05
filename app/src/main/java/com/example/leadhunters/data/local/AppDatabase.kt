@@ -14,7 +14,7 @@ import androidx.room.TypeConverters
 
 @Database(
     entities = [Lead::class, AppCallLog::class, CallOutcome::class, SyncItem::class, WhatsAppTemplate::class, Reminder::class],
-    version = 5,
+    version = 6,
     exportSchema = false
 )
 @TypeConverters(Converters::class)

@@ -19,7 +19,9 @@ class CallLogsViewModel @Inject constructor(
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
 
-    private val _allLogs = repository.getCallLogs()
+    private val cutoffTime = System.currentTimeMillis() - (14L * 24 * 60 * 60 * 1000)
+    
+    private val _allLogs = repository.getCallLogs(cutoffTime)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val callLogs: StateFlow<List<AppCallLog>> = combine(_allLogs, _searchQuery) { logs, query ->

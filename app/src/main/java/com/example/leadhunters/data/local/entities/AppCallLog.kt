@@ -3,7 +3,15 @@ package com.example.leadhunters.data.local.entities
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
-@Entity(tableName = "app_call_logs")
+import androidx.room.Index
+
+@Entity(
+    tableName = "app_call_logs",
+    indices = [
+        Index(value = ["startTime"]),
+        Index(value = ["phoneNumber"])
+    ]
+)
 data class AppCallLog(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val leadId: String,

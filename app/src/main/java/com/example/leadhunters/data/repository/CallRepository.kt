@@ -9,7 +9,7 @@ interface CallRepository {
     fun getLeads(): Flow<List<Lead>>
     suspend fun getLeadById(id: String): Lead?
     suspend fun insertLead(lead: Lead)
-    fun getCallLogs(): Flow<List<AppCallLog>>
+    fun getCallLogs(cutoffTime: Long): Flow<List<AppCallLog>>
     suspend fun startCall(leadId: String?, phoneNumber: String): Long
     suspend fun finalizeCall(callLogId: Long, duration: Long, status: String, systemCallLogId: Long? = null)
     suspend fun getLogById(id: Long): AppCallLog?

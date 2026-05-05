@@ -31,8 +31,8 @@ interface TeleCallerDao {
     suspend fun updateLead(lead: Lead)
 
     // Call Logs
-    @Query("SELECT * FROM app_call_logs ORDER BY startTime DESC")
-    fun getAllCallLogs(): Flow<List<AppCallLog>>
+    @Query("SELECT * FROM app_call_logs WHERE startTime >= :cutoffTime ORDER BY startTime DESC")
+    fun getAllCallLogs(cutoffTime: Long): Flow<List<AppCallLog>>
 
     @Query("SELECT * FROM app_call_logs WHERE id = :id")
     suspend fun getCallLogById(id: Long): AppCallLog?
@@ -84,6 +84,9 @@ interface TeleCallerDao {
 
     @Update
     suspend fun updateSyncItem(syncItem: SyncItem)
+
+    @Query("DELETE FROM sync_queue WHERE status = 'COMPLETED'")
+    suspend fun purgeCompletedSyncItems()
 
     // Templates
     @Query("SELECT * FROM whatsapp_templates")

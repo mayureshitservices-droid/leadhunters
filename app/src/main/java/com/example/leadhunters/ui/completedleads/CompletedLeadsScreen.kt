@@ -75,7 +75,7 @@ class CompletedLeadsViewModel @Inject constructor(
 
     val uiState: StateFlow<CompletedLeadsUiState> = combine(
         workRepository.getLeads(),
-        callRepository.getCallLogs(),
+        callRepository.getCallLogs(System.currentTimeMillis() - (14L * 24 * 60 * 60 * 1000)),
         callRepository.getAllOutcomes(),
         teleCallerDao.getPendingSyncItems(),
         _selectedBusinessOwnerId
