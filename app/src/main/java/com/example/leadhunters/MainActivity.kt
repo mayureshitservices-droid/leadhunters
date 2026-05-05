@@ -8,8 +8,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
+import javax.inject.Inject
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
@@ -35,6 +35,10 @@ import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+
+    @Inject
+    lateinit var appUpdater: com.example.leadhunters.updater.AppUpdater
+
     override fun onCreate(savedInstanceState: Bundle?) {
         // Handle the splash screen transition.
         installSplashScreen()
@@ -43,6 +47,42 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             LeadHuntersTheme {
+                var updateResult by remember { mutableStateOf<com.example.leadhunters.updater.UpdateResult?>(null) }
+
+                LaunchedEffect(Unit) {
+                    updateResult = appUpdater.checkForUpdate()
+                }
+
+                if (updateResult is com.example.leadhunters.updater.UpdateResult.UpdateAvailable) {
+                    val available = updateResult as com.example.leadhunters.updater.UpdateResult.UpdateAvailable
+                    AlertDialog(
+                        onDismissRequest = {
+                            if (!available.mandatory) {
+                                updateResult = null
+                            }
+                        },
+                        title = { Text("Update Available") },
+                        text = { Text("A new version (${available.versionName}) is available. Please update to continue using the best features.") },
+                        confirmButton = {
+                            Button(onClick = {
+                                appUpdater.downloadAndInstall(this@MainActivity, available.downloadUrl)
+                                if (!available.mandatory) {
+                                    updateResult = null
+                                }
+                            }) {
+                                Text("Update")
+                            }
+                        },
+                        dismissButton = {
+                            if (!available.mandatory) {
+                                TextButton(onClick = { updateResult = null }) {
+                                    Text("Later")
+                                }
+                            }
+                        }
+                    )
+                }
+
                 com.example.leadhunters.ui.permissions.GlobalPermissionHandler {
                     MainScreen()
                 }

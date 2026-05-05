@@ -12,5 +12,6 @@ data class Lead(
     val businessOwnerId: String,
     val businessOwnerName: String,
     val lastCallTimestamp: Long? = null,
-    val callCount: Int = 0
+    val callCount: Int = 0,
+    val additionalData: Map<String, Any>? = null
 )

@@ -35,7 +35,8 @@ class WorkRepositoryImpl @Inject constructor(
                         phoneNumber = dto.phone,
                         status = dto.status,
                         businessOwnerId = dto.businessOwnerId,
-                        businessOwnerName = dto.businessOwnerName
+                        businessOwnerName = dto.businessOwnerName,
+                        additionalData = dto.additionalData
                     )
                 }
                 teleCallerDao.insertLeads(entities)

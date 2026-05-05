@@ -44,6 +44,7 @@ import com.example.leadhunters.ui.logs.PlaybackState
 import com.example.leadhunters.ui.components.CallStatusBadge
 import com.example.leadhunters.ui.components.formatDuration
 import com.example.leadhunters.ui.components.formatDurationMs
+import com.example.leadhunters.ui.components.LeadInsightsSection
 import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -252,6 +253,12 @@ fun LeadItemCard(
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(text = lead.phoneNumber, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Medium)
             }
+
+            // New Dynamic Insights Section
+            LeadInsightsSection(
+                additionalData = lead.additionalData,
+                modifier = Modifier.padding(top = 8.dp)
+            )
 
             // Enhanced Call Log Section - Only visible if a call has happened
             AnimatedVisibility(

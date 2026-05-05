@@ -107,7 +107,30 @@ fun OutcomeForm(
     var showDatePicker by rememberSaveable { mutableStateOf(false) }
     var showTimePicker by rememberSaveable { mutableStateOf(false) }
 
-    val types = listOf("Interested", "Ordered", "Booked", "Remind later", "Lost")
+    val types = listOf(
+        "Interested", 
+        "Ordered", 
+        "Booked", 
+        "Remind later", 
+        "Lost",
+        "CB Request",
+        "Left Msg",
+        "Call Disconnect",
+        "Bank PTP",
+        "FPTP",
+        "PTP",
+        "Busy",
+        "Not Reachable",
+        "RNR",
+        "Out of service",
+        "Switch OFF",
+        "Incoming not avaiable",
+        "Partial Paid",
+        "Already Paid",
+        "Death",
+        "CSWN",
+        "RTP"
+    )
     val isReminder = selectedType == "Remind later"
 
     val dateFormatter = remember { SimpleDateFormat("dd MMM yyyy", Locale.getDefault()) }

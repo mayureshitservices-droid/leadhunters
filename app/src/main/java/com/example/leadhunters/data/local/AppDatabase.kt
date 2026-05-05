@@ -10,11 +10,14 @@ import com.example.leadhunters.data.local.entities.Reminder
 import com.example.leadhunters.data.local.entities.SyncItem
 import com.example.leadhunters.data.local.entities.WhatsAppTemplate
 
+import androidx.room.TypeConverters
+
 @Database(
     entities = [Lead::class, AppCallLog::class, CallOutcome::class, SyncItem::class, WhatsAppTemplate::class, Reminder::class],
-    version = 4,
+    version = 5,
     exportSchema = false
 )
+@TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun teleCallerDao(): TeleCallerDao
 }

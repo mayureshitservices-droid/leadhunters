@@ -63,4 +63,10 @@ object NetworkModule {
     fun provideWorkApiService(retrofit: Retrofit): WorkApiService {
         return retrofit.create(WorkApiService::class.java)
     }
+
+    @Provides
+    @Singleton
+    fun provideAppApiService(retrofit: Retrofit): com.example.leadhunters.data.remote.api.AppApiService {
+        return retrofit.create(com.example.leadhunters.data.remote.api.AppApiService::class.java)
+    }
 }

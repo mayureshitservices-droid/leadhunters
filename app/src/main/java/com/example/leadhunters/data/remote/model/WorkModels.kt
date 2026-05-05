@@ -12,7 +12,8 @@ data class LeadDto(
     @SerializedName("phone") val phone: String,
     @SerializedName("status") val status: String,
     @SerializedName("business_owner_id") val businessOwnerId: String,
-    @SerializedName("business_owner_name") val businessOwnerName: String
+    @SerializedName("business_owner_name") val businessOwnerName: String,
+    @SerializedName("additional_data") val additionalData: Map<String, Any>? = null
 )
 
 data class CallLogSyncRequest(
