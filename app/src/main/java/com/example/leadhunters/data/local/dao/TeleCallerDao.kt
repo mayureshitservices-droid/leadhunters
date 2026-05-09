@@ -27,6 +27,9 @@ interface TeleCallerDao {
     @Query("DELETE FROM leads")
     suspend fun clearLeads()
 
+    @Query("DELETE FROM leads WHERE id IN (:ids)")
+    suspend fun deleteLeadsByIds(ids: List<String>)
+
     @Update
     suspend fun updateLead(lead: Lead)
 

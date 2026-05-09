@@ -11,4 +11,12 @@ interface AuthApiService {
     suspend fun registerDevice(
         @Body request: DeviceRegistrationRequest
     ): Response<AuthResponse>
+
+    @POST("/api/auth/heartbeat")
+    suspend fun heartbeat(): Response<HeartbeatResponse>
 }
+
+data class HeartbeatResponse(
+    val success: Boolean,
+    val deletedLeads: List<String>? = null
+)

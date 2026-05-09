@@ -19,4 +19,5 @@ interface WorkRepository {
         serverLogId: String,
         recordingPath: String
     ): Result<Unit>
+    suspend fun deleteLeadsLocally(ids: List<String>)
 }

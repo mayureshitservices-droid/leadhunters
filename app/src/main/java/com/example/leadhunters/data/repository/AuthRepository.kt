@@ -11,6 +11,7 @@ import javax.inject.Singleton
 interface AuthRepository {
     suspend fun registerDevice(): Result<String>
     suspend fun isRegistered(): Boolean
+    suspend fun sendHeartbeat(): Result<List<String>>
 }
 
 @Singleton
@@ -60,5 +61,18 @@ class AuthRepositoryImpl @Inject constructor(
 
     override suspend fun isRegistered(): Boolean {
         return authPreferences.authToken.first() != null
+    }
+
+    override suspend fun sendHeartbeat(): Result<List<String>> {
+        return try {
+            val response = authApiService.heartbeat()
+            if (response.isSuccessful) {
+                Result.success(response.body()?.deletedLeads ?: emptyList())
+            } else {
+                Result.failure(Exception("Heartbeat failed: ${response.code()}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
     }
 }

@@ -39,6 +39,12 @@ class MainActivity : ComponentActivity() {
     @Inject
     lateinit var appUpdater: com.example.leadhunters.updater.AppUpdater
 
+    @Inject
+    lateinit var authRepository: com.example.leadhunters.data.repository.AuthRepository
+
+    @Inject
+    lateinit var workRepository: com.example.leadhunters.data.repository.WorkRepository
+
     override fun onCreate(savedInstanceState: Bundle?) {
         // Handle the splash screen transition.
         installSplashScreen()
@@ -51,6 +57,25 @@ class MainActivity : ComponentActivity() {
 
                 LaunchedEffect(Unit) {
                     updateResult = appUpdater.checkForUpdate()
+                }
+
+                // Periodic Heartbeat (Every 30 seconds while app is open)
+                LaunchedEffect(Unit) {
+                    while (true) {
+                        try {
+                            if (authRepository.isRegistered()) {
+                                val result = authRepository.sendHeartbeat()
+                                result.onSuccess { deletedIds ->
+                                    if (deletedIds.isNotEmpty()) {
+                                        workRepository.deleteLeadsLocally(deletedIds)
+                                    }
+                                }
+                            }
+                        } catch (e: Exception) {
+                            // Silently fail, it's just a heartbeat
+                        }
+                        kotlinx.coroutines.delay(30000)
+                    }
                 }
 
                 if (updateResult is com.example.leadhunters.updater.UpdateResult.UpdateAvailable) {

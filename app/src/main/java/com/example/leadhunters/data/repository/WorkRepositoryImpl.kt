@@ -117,4 +117,14 @@ class WorkRepositoryImpl @Inject constructor(
             Result.failure(e)
         }
     }
+
+    override suspend fun deleteLeadsLocally(ids: List<String>) {
+        if (ids.isEmpty()) return
+        try {
+            teleCallerDao.deleteLeadsByIds(ids)
+            Log.i("WorkRepository", "Locally deleted ${ids.size} leads via heartbeat command")
+        } catch (e: Exception) {
+            Log.e("WorkRepository", "Error deleting leads locally: ${e.message}")
+        }
+    }
 }
