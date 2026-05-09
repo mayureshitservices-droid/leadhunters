@@ -68,8 +68,8 @@ class CallReconciler @Inject constructor(
                             val systemId = it.getLong(idIdx)
 
                             val status = when (type) {
-                                CallLog.Calls.OUTGOING_TYPE -> if (duration > 0L) "ANSWERED" else "REJECTED"
-                                CallLog.Calls.INCOMING_TYPE -> if (duration > 0L) "ANSWERED" else "MISSED"
+                                CallLog.Calls.OUTGOING_TYPE -> if (duration > 1L) "ANSWERED" else "REJECTED"
+                                CallLog.Calls.INCOMING_TYPE -> if (duration > 1L) "ANSWERED" else "MISSED"
                                 CallLog.Calls.MISSED_TYPE -> "MISSED"
                                 CallLog.Calls.REJECTED_TYPE -> "REJECTED"
                                 else -> "ENDED"

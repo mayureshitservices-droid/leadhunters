@@ -28,6 +28,7 @@ import androidx.compose.ui.Alignment
 import kotlinx.coroutines.launch
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -58,11 +59,64 @@ fun LeadsScreen(
     val playbackState by viewModel.playbackState.collectAsState()
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
+    val isAutoDialActive by viewModel.isAutoDialActive.collectAsState()
+
+    // Handle Auto-Dial Events
+    LaunchedEffect(Unit) {
+        viewModel.autoDialEvent.collect { lead ->
+            makeCall(context, lead)
+        }
+    }
+
+    // Handle Auto-Navigation to Outcome
+    LaunchedEffect(Unit) {
+        viewModel.autoNavigateEvent.collect { callLogId ->
+            onOutcomeClick(callLogId)
+        }
+    }
+
+    // Presence Check: Stop Auto-Dial if user leaves the screen
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            // Removed stopAutoDial from ON_PAUSE to allow persistence during calls
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_DESTROY) {
+                if (isAutoDialActive) viewModel.stopAutoDial()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("My Leads", fontWeight = FontWeight.Bold) },
+                actions = {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(end = 8.dp)
+                    ) {
+                        Text(
+                            text = "Auto-Dial",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = if (isAutoDialActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Switch(
+                            checked = isAutoDialActive,
+                            onCheckedChange = { viewModel.toggleAutoDial() },
+                            modifier = Modifier.scale(0.8f),
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Color.White,
+                                checkedTrackColor = SuccessEmerald,
+                                uncheckedThumbColor = MaterialTheme.colorScheme.outline,
+                                uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant
+                            )
+                        )
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background,
                     titleContentColor = MaterialTheme.colorScheme.primary
@@ -82,6 +136,48 @@ fun LeadsScreen(
                 selectedId = uiState.selectedBusinessOwnerId,
                 onSelect = { viewModel.filterByBusinessOwner(it) }
             )
+
+            AnimatedVisibility(visible = isAutoDialActive) {
+                Surface(
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Icon(
+                            Icons.Default.Autorenew,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                            tint = Color.White
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            "AUTO-DIALING MODE ACTIVE",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = Color.White,
+                            fontWeight = FontWeight.Black,
+                            modifier = Modifier.weight(1f)
+                        )
+                        
+                        Surface(
+                            onClick = { viewModel.stopAutoDial() },
+                            color = Color.White.copy(alpha = 0.2f),
+                            shape = CircleShape
+                        ) {
+                            Text(
+                                "STOP", 
+                                color = Color.White, 
+                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.labelSmall,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                            )
+                        }
+                    }
+                }
+            }
 
             if (uiState.isLoading && uiState.leads.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {

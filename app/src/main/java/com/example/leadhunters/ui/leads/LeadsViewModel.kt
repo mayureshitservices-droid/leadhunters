@@ -8,6 +8,8 @@ import com.example.leadhunters.data.repository.WorkRepository
 import com.example.leadhunters.util.AnalyticsHelper
 import com.example.leadhunters.data.local.dao.TeleCallerDao
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -39,7 +41,8 @@ class LeadsViewModel @Inject constructor(
     private val callRepository: CallRepository,
     private val teleCallerDao: TeleCallerDao,
     private val analyticsHelper: AnalyticsHelper,
-    val playbackManager: com.example.leadhunters.ui.logs.CallPlaybackManager
+    val playbackManager: com.example.leadhunters.ui.logs.CallPlaybackManager,
+    private val autoDialManager: com.example.leadhunters.data.system.AutoDialManager
 ) : ViewModel() {
 
     private val _selectedBusinessOwnerId = MutableStateFlow<String?>(null)
@@ -47,6 +50,18 @@ class LeadsViewModel @Inject constructor(
     private val _error = MutableStateFlow<String?>(null)
 
     val playbackState = playbackManager.state
+    
+    val isAutoDialActive = autoDialManager.isAutoDialActive
+    
+    private val _autoDialEvent = Channel<com.example.leadhunters.data.local.entities.Lead>(Channel.BUFFERED)
+    val autoDialEvent = _autoDialEvent.receiveAsFlow()
+    
+    private val _autoNavigateEvent = Channel<Long>(Channel.BUFFERED)
+    val autoNavigateEvent = _autoNavigateEvent.receiveAsFlow()
+
+    private var lastProcessedLeadId: String? = null
+    private var lastProcessedLogId: Long? = null
+    private var isTransitioning = false
 
     val uiState: StateFlow<LeadsUiState> = combine(
         workRepository.getLeads(),
@@ -99,6 +114,106 @@ class LeadsViewModel @Inject constructor(
 
     init {
         refreshLeads()
+        observeAutoDialProgress()
+    }
+
+    private fun observeAutoDialProgress() {
+        viewModelScope.launch {
+            // Monitor the UI state for changes that should trigger the next call
+            uiState.collect { state ->
+                if (!autoDialManager.isActive()) {
+                    lastProcessedLeadId = null
+                    lastProcessedLogId = null
+                    return@collect
+                }
+
+                val currentLeadId = lastProcessedLeadId ?: return@collect
+                
+                // Find the lead we are currently auto-dialing
+                val currentLeadWithLog = state.leads.find { it.lead.id == currentLeadId }
+                
+                if (currentLeadWithLog == null) {
+                    // Lead is gone from the "My Leads" list (likely has an outcome now)
+                    if (!isTransitioning) {
+                        triggerNextAutoDial()
+                    }
+                    return@collect
+                }
+
+                val latestLog = currentLeadWithLog.latestLog ?: return@collect
+                
+                // Check if this is a new log we haven't processed yet
+                if (latestLog.id != lastProcessedLogId && !isTransitioning) {
+                    if (latestLog.status != "PENDING") {
+                        // Mark as processed immediately
+                        lastProcessedLogId = latestLog.id
+                        
+                        if (latestLog.status != "ANSWERED") {
+                            // Call not answered, move to next after delay
+                            viewModelScope.launch {
+                                isTransitioning = true
+                                delay(AUTO_DIAL_DELAY_MS)
+                                triggerNextAutoDial()
+                                isTransitioning = false
+                            }
+                        } else {
+                            // Call was answered, force navigation to outcome form
+                            viewModelScope.launch {
+                                _autoNavigateEvent.send(latestLog.id)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    fun stopAutoDial() {
+        autoDialManager.stopAutoDial()
+        lastProcessedLeadId = null
+        lastProcessedLogId = null
+        isTransitioning = false
+    }
+
+    fun toggleAutoDial() {
+        if (autoDialManager.isActive()) {
+            stopAutoDial()
+        } else {
+            val currentLeads = uiState.value.leads.map { it.lead }
+            if (currentLeads.isNotEmpty()) {
+                autoDialManager.startAutoDial(currentLeads)
+                triggerNextAutoDial()
+            }
+        }
+    }
+
+    fun filterByBusinessOwner(ownerId: String?) {
+        _selectedBusinessOwnerId.value = ownerId
+        // Safety: Stop auto-dial if filters change
+        if (autoDialManager.isActive()) {
+            stopAutoDial()
+        }
+    }
+
+    private fun triggerNextAutoDial() {
+        if (isTransitioning) return
+        
+        viewModelScope.launch {
+            isTransitioning = true
+            val nextLead = autoDialManager.getNextLead()
+            if (nextLead != null) {
+                // IMPORTANT: Create the database record first
+                startCall(nextLead)
+                
+                lastProcessedLeadId = nextLead.id
+                lastProcessedLogId = null
+                delay(800) // Small delay for UI stability
+                _autoDialEvent.send(nextLead)
+            } else {
+                stopAutoDial()
+            }
+            isTransitioning = false
+        }
     }
 
     fun refreshLeads() {
@@ -109,10 +224,6 @@ class LeadsViewModel @Inject constructor(
                 .onFailure { _error.value = it.message }
             _isLoading.value = false
         }
-    }
-
-    fun filterByBusinessOwner(ownerId: String?) {
-        _selectedBusinessOwnerId.value = ownerId
     }
 
     suspend fun startCall(lead: Lead): Long {
@@ -127,5 +238,9 @@ class LeadsViewModel @Inject constructor(
     override fun onCleared() {
         super.onCleared()
         playbackManager.stop()
+    }
+
+    companion object {
+        private const val AUTO_DIAL_DELAY_MS = 5000L
     }
 }

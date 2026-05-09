@@ -11,6 +11,7 @@ import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import kotlinx.coroutines.flow.first
 import android.widget.Toast
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import androidx.core.app.NotificationCompat
@@ -97,6 +98,9 @@ class SyncWorker @AssistedInject constructor(
                         Log.i("SyncWorker", "Call log metadata synced. Server ID: $serverLogId")
                         
                         if (serverLogId != null && !callLog.recordingPath.isNullOrEmpty()) {
+                            // Safety: Wait a bit to ensure file is fully written by system
+                            delay(3000)
+                            
                             val recordingResult = workRepository.uploadRecording(
                                 serverLogId = serverLogId,
                                 recordingPath = callLog.recordingPath

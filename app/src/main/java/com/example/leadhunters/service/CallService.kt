@@ -148,7 +148,7 @@ class CallService : Service() {
             TelephonyManager.CALL_STATE_IDLE -> {
                 Log.d("CallService", "Call IDLE")
                 serviceScope.launch {
-                    delay(2000) 
+                    delay(5000) // Give system 5s to finalize recording and log
                     reconciler.reconcile(targetNumber, leadId)
                 }
             }
