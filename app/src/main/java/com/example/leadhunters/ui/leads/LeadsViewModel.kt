@@ -152,9 +152,28 @@ class LeadsViewModel @Inject constructor(
                             // Call not answered, move to next after delay
                             viewModelScope.launch {
                                 isTransitioning = true
+                                
+                                // Automatically save outcome for unanswered call
+                                val outcome = com.example.leadhunters.data.local.entities.CallOutcome(
+                                    callLogId = latestLog.id,
+                                    leadId = latestLog.leadId,
+                                    customerName = currentLeadWithLog.lead.name,
+                                    outcomeType = latestLog.status,
+                                    remarks = "Auto-logged"
+                                )
+                                callRepository.insertOutcome(outcome)
+                                callRepository.enqueueSync(
+                                    com.example.leadhunters.data.local.entities.SyncItem(
+                                        type = "OUTCOME",
+                                        referenceId = latestLog.id.toString(),
+                                        operation = "CREATE",
+                                        payload = ""
+                                    )
+                                )
+                                
                                 delay(AUTO_DIAL_DELAY_MS)
+                                isTransitioning = false // IMPORTANT: Clear flag BEFORE triggering next
                                 triggerNextAutoDial()
-                                isTransitioning = false
                             }
                         } else {
                             // Call was answered, force navigation to outcome form
