@@ -16,7 +16,8 @@ interface AuthApiService {
     suspend fun heartbeat(): Response<HeartbeatResponse>
 }
 
+@androidx.annotation.Keep
 data class HeartbeatResponse(
-    val success: Boolean,
-    val deletedLeads: List<String>? = null
+    @com.google.gson.annotations.SerializedName("success") val success: Boolean,
+    @com.google.gson.annotations.SerializedName("deletedLeads") val deletedLeads: List<String>? = null
 )

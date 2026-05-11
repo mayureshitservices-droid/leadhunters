@@ -22,28 +22,30 @@ class UpdateReceiver : BroadcastReceiver() {
         val downloadManager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
         val query = DownloadManager.Query().setFilterById(downloadId)
         val cursor = downloadManager.query(query)
+        
         if (cursor.moveToFirst()) {
             val statusColumn = cursor.getColumnIndex(DownloadManager.COLUMN_STATUS)
             if (statusColumn >= 0 && cursor.getInt(statusColumn) == DownloadManager.STATUS_SUCCESSFUL) {
-                val localUriColumn = cursor.getColumnIndex(DownloadManager.COLUMN_LOCAL_URI)
-                if (localUriColumn >= 0) {
-                    val localUriString = cursor.getString(localUriColumn)
-                    val apkUri = Uri.parse(localUriString)
-                    
-                    val apkFile = File(apkUri.path ?: "")
-                    if (apkFile.exists()) {
-                         val contentUri = FileProvider.getUriForFile(
-                             context,
-                             "${context.packageName}.provider",
-                             apkFile
-                         )
-                         val installIntent = Intent(Intent.ACTION_VIEW).apply {
-                             setDataAndType(contentUri, "application/vnd.android.package-archive")
-                             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION
-                         }
-                         context.startActivity(installIntent)
+                // Modern way: get the URI directly from DownloadManager
+                val apkUri = downloadManager.getUriForDownloadedFile(downloadId)
+                
+                if (apkUri != null) {
+                    android.util.Log.i("UpdateReceiver", "Installing APK from URI: $apkUri")
+                    val installIntent = Intent(Intent.ACTION_VIEW).apply {
+                        setDataAndType(apkUri, "application/vnd.android.package-archive")
+                        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION
                     }
+                    try {
+                        context.startActivity(installIntent)
+                    } catch (e: Exception) {
+                        android.util.Log.e("UpdateReceiver", "Failed to start installation: ${e.message}")
+                    }
+                } else {
+                    android.util.Log.e("UpdateReceiver", "Could not get URI for downloaded file")
                 }
+            } else {
+                val status = if (statusColumn >= 0) cursor.getInt(statusColumn) else -1
+                android.util.Log.e("UpdateReceiver", "Download failed or incomplete. Status: $status")
             }
         }
         cursor.close()

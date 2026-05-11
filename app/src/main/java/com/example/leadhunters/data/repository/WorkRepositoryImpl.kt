@@ -121,7 +121,12 @@ class WorkRepositoryImpl @Inject constructor(
     override suspend fun deleteLeadsLocally(ids: List<String>) {
         if (ids.isEmpty()) return
         try {
-            teleCallerDao.deleteLeadsByIds(ids)
+            // SQLite has a hard limit of 999 bind parameters per query.
+            // Chunking into batches of 900 prevents a silent crash when the
+            // business owner deletes a large campaign (e.g. 1000+ leads at once).
+            ids.chunked(900).forEach { chunk ->
+                teleCallerDao.deleteLeadsByIds(chunk)
+            }
             Log.i("WorkRepository", "Locally deleted ${ids.size} leads via heartbeat command")
         } catch (e: Exception) {
             Log.e("WorkRepository", "Error deleting leads locally: ${e.message}")

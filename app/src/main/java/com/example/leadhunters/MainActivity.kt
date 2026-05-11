@@ -4,12 +4,13 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import javax.inject.Inject
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
@@ -31,6 +32,8 @@ import com.example.leadhunters.ui.more.TemplateManagementScreen
 import com.example.leadhunters.ui.more.WhatsAppSendFlow
 import com.example.leadhunters.ui.outcome.OutcomeFormScreen
 import com.example.leadhunters.ui.init.InitScreen
+import androidx.compose.ui.window.DialogProperties
+import kotlinx.coroutines.delay
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
@@ -54,8 +57,13 @@ class MainActivity : ComponentActivity() {
         setContent {
             LeadHuntersTheme {
                 var updateResult by remember { mutableStateOf<com.example.leadhunters.updater.UpdateResult?>(null) }
+                val downloadProgress by appUpdater.downloadProgress.collectAsState()
+                val context = androidx.compose.ui.platform.LocalContext.current
 
                 LaunchedEffect(Unit) {
+                    delay(1000)
+                    // Optional: show a small toast so the user knows the check is happening
+                    // android.widget.Toast.makeText(context, "Checking for updates...", android.widget.Toast.LENGTH_SHORT).show()
                     updateResult = appUpdater.checkForUpdate()
                 }
 
@@ -83,24 +91,54 @@ class MainActivity : ComponentActivity() {
                     AlertDialog(
                         onDismissRequest = {
                             if (!available.mandatory) {
-                                updateResult = null
+                                updateResult = com.example.leadhunters.updater.UpdateResult.NoUpdate
                             }
                         },
+                        properties = DialogProperties(
+                            dismissOnBackPress = !available.mandatory,
+                            dismissOnClickOutside = !available.mandatory
+                        ),
                         title = { Text("Update Available") },
-                        text = { Text("A new version (${available.versionName}) is available. Please update to continue using the best features.") },
-                        confirmButton = {
-                            Button(onClick = {
-                                appUpdater.downloadAndInstall(this@MainActivity, available.downloadUrl)
-                                if (!available.mandatory) {
-                                    updateResult = null
+                        text = { 
+                            Column {
+                                Text("A new version (${available.versionName}) is available.")
+                                if (available.mandatory) {
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text(
+                                        "This is a mandatory update. Please install it to continue using the app.",
+                                        color = MaterialTheme.colorScheme.error,
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
                                 }
-                            }) {
-                                Text("Update")
+                                
+                                if (downloadProgress != null) {
+                                    Spacer(modifier = Modifier.height(16.dp))
+                                    Text(
+                                        text = if (downloadProgress == 100) "Preparing installation..." else "Downloading... $downloadProgress%",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    LinearProgressIndicator(
+                                        progress = (downloadProgress ?: 0).toFloat() / 100f,
+                                        modifier = Modifier.fillMaxWidth(),
+                                    )
+                                }
+                            }
+                        },
+                        confirmButton = {
+                            Button(
+                                enabled = downloadProgress == null,
+                                onClick = {
+                                    appUpdater.downloadAndInstall(this@MainActivity, available.downloadUrl)
+                                }
+                            ) {
+                                Text(if (downloadProgress != null) "Downloading..." else if (available.mandatory) "Update Now" else "Update")
                             }
                         },
                         dismissButton = {
-                            if (!available.mandatory) {
-                                TextButton(onClick = { updateResult = null }) {
+                            if (!available.mandatory && downloadProgress == null) {
+                                TextButton(onClick = { updateResult = com.example.leadhunters.updater.UpdateResult.NoUpdate }) {
                                     Text("Later")
                                 }
                             }
@@ -108,8 +146,36 @@ class MainActivity : ComponentActivity() {
                     )
                 }
 
+                if (updateResult is com.example.leadhunters.updater.UpdateResult.Error) {
+                    val error = updateResult as com.example.leadhunters.updater.UpdateResult.Error
+                    AlertDialog(
+                        onDismissRequest = { updateResult = com.example.leadhunters.updater.UpdateResult.NoUpdate },
+                        title = { Text("Update Check Failed") },
+                        text = { Text(error.message) },
+                        confirmButton = {
+                            TextButton(onClick = { updateResult = com.example.leadhunters.updater.UpdateResult.NoUpdate }) {
+                                Text("Dismiss")
+                            }
+                        }
+                    )
+                }
+
                 com.example.leadhunters.ui.permissions.GlobalPermissionHandler {
-                    MainScreen()
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        MainScreen()
+                        
+                        // Small status indicator during the check
+                        if (updateResult == null) {
+                            Text(
+                                "Checking for updates...",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                                modifier = Modifier
+                                    .align(Alignment.BottomCenter)
+                                    .padding(16.dp)
+                            )
+                        }
+                    }
                 }
             }
         }

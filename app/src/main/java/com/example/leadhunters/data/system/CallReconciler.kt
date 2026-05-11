@@ -15,6 +15,7 @@ class CallReconciler @Inject constructor(
     @ApplicationContext private val context: Context,
     private val repository: CallRepository,
     private val recordingScanner: RecordingScanner,
+    private val autoDialManager: AutoDialManager,
     private val analyticsHelper: AnalyticsHelper
 ) {
 
@@ -33,6 +34,12 @@ class CallReconciler @Inject constructor(
             Log.i("CallReconciler", "Attempting reconcile for ${pendingLogs.size} logs for $phoneNumber")
             
             for (pendingLog in pendingLogs) {
+                // Re-verify it's still unreconciled (to prevent double-processing from parallel calls)
+                val currentStatus = repository.getLogById(pendingLog.id)
+                if (currentStatus == null || currentStatus.isReconciled) {
+                    continue
+                }
+
                 try {
                     val cursor = context.contentResolver.query(
                         CallLog.Calls.CONTENT_URI,
@@ -124,6 +131,10 @@ class CallReconciler @Inject constructor(
                             
                             Log.i("CallReconciler", "Successfully reconciled log ${pendingLog.id} with system ID $systemId")
                             analyticsHelper.logReconciliation(phoneNumber, true, "Matched system ID $systemId")
+                            
+                            // Smart-Skip trigger
+                            autoDialManager.onCallEnded(status)
+                            
                             break // Stop after first match
                         }
                         

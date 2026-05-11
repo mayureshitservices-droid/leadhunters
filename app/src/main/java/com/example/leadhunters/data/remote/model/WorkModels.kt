@@ -2,10 +2,12 @@ package com.example.leadhunters.data.remote.model
 
 import com.google.gson.annotations.SerializedName
 
+@androidx.annotation.Keep
 data class LeadsResponse(
     @SerializedName("leads") val leads: List<LeadDto>
 )
 
+@androidx.annotation.Keep
 data class LeadDto(
     @SerializedName("id") val id: String,
     @SerializedName("name") val name: String,
@@ -16,6 +18,7 @@ data class LeadDto(
     @SerializedName("additional_data") val additionalData: Map<String, Any>? = null
 )
 
+@androidx.annotation.Keep
 data class CallLogSyncRequest(
     @SerializedName("local_log_id") val localLogId: String,
     @SerializedName("lead_id") val leadId: String,
@@ -25,7 +28,9 @@ data class CallLogSyncRequest(
     @SerializedName("notes") val notes: String? = null
 )
 
+@androidx.annotation.Keep
 data class SyncResponse(
     @SerializedName("success") val success: Boolean,
     @SerializedName("log_id") val logId: String? = null
 )
+

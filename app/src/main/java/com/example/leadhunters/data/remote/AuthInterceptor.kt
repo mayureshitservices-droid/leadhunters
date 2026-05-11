@@ -16,8 +16,9 @@ class AuthInterceptor @Inject constructor(
     override fun intercept(chain: Interceptor.Chain): Response {
         val request = chain.request()
         
-        // Skip auth for registration endpoint
-        if (request.url.encodedPath.contains("/api/auth/deviceregistration")) {
+        // Skip auth for registration and version endpoints (be very aggressive with matching)
+        val path = request.url.encodedPath.lowercase()
+        if (path.contains("deviceregistration") || path.contains("version")) {
             return chain.proceed(request)
         }
 

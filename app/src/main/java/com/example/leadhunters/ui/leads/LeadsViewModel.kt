@@ -114,73 +114,38 @@ class LeadsViewModel @Inject constructor(
 
     init {
         refreshLeads()
-        observeAutoDialProgress()
+        observeAutoDialEvents()
+    }
+
+    private fun observeAutoDialEvents() {
+        viewModelScope.launch {
+            autoDialManager.autoDialEvents.collect { lead ->
+                isTransitioning = true
+                startCall(lead)
+                lastProcessedLeadId = lead.id
+                lastProcessedLogId = null
+                delay(800)
+                _autoDialEvent.send(lead)
+                isTransitioning = false
+            }
+        }
     }
 
     private fun observeAutoDialProgress() {
+        // This is now partially handled by AutoDialManager's onCallEnded
+        // But we still monitor answered calls for auto-navigation
         viewModelScope.launch {
-            // Monitor the UI state for changes that should trigger the next call
             uiState.collect { state ->
-                if (!autoDialManager.isActive()) {
-                    lastProcessedLeadId = null
-                    lastProcessedLogId = null
-                    return@collect
-                }
+                if (!autoDialManager.isActive()) return@collect
 
                 val currentLeadId = lastProcessedLeadId ?: return@collect
-                
-                // Find the lead we are currently auto-dialing
-                val currentLeadWithLog = state.leads.find { it.lead.id == currentLeadId }
-                
-                if (currentLeadWithLog == null) {
-                    // Lead is gone from the "My Leads" list (likely has an outcome now)
-                    if (!isTransitioning) {
-                        triggerNextAutoDial()
-                    }
-                    return@collect
-                }
-
+                val currentLeadWithLog = state.leads.find { it.lead.id == currentLeadId } ?: return@collect
                 val latestLog = currentLeadWithLog.latestLog ?: return@collect
-                
-                // Check if this is a new log we haven't processed yet
+
                 if (latestLog.id != lastProcessedLogId && !isTransitioning) {
-                    if (latestLog.status != "PENDING") {
-                        // Mark as processed immediately
+                    if (latestLog.status == "ANSWERED") {
                         lastProcessedLogId = latestLog.id
-                        
-                        if (latestLog.status != "ANSWERED") {
-                            // Call not answered, move to next after delay
-                            viewModelScope.launch {
-                                isTransitioning = true
-                                
-                                // Automatically save outcome for unanswered call
-                                val outcome = com.example.leadhunters.data.local.entities.CallOutcome(
-                                    callLogId = latestLog.id,
-                                    leadId = latestLog.leadId,
-                                    customerName = currentLeadWithLog.lead.name,
-                                    outcomeType = latestLog.status,
-                                    remarks = "Auto-logged"
-                                )
-                                callRepository.insertOutcome(outcome)
-                                callRepository.enqueueSync(
-                                    com.example.leadhunters.data.local.entities.SyncItem(
-                                        type = "OUTCOME",
-                                        referenceId = latestLog.id.toString(),
-                                        operation = "CREATE",
-                                        payload = ""
-                                    )
-                                )
-                                
-                                delay(AUTO_DIAL_DELAY_MS)
-                                isTransitioning = false // IMPORTANT: Clear flag BEFORE triggering next
-                                triggerNextAutoDial()
-                            }
-                        } else {
-                            // Call was answered, force navigation to outcome form
-                            viewModelScope.launch {
-                                _autoNavigateEvent.send(latestLog.id)
-                            }
-                        }
+                        _autoNavigateEvent.send(latestLog.id)
                     }
                 }
             }

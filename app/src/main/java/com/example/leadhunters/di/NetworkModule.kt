@@ -18,7 +18,7 @@ import javax.inject.Singleton
 @InstallIn(SingletonComponent::class)
 object NetworkModule {
 
-    private const val BASE_URL = "https://leadhunters.decisionmakers.in" // Update this with your actual backend URL
+    private const val BASE_URL = "https://leadhunters.decisionmakers.in/" // Trailing slash is REQUIRED by Retrofit
 
     @Provides
     @Singleton

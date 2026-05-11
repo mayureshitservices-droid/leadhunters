@@ -1,5 +1,7 @@
 package com.example.leadhunters.ui.more
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -10,13 +12,16 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
+import com.example.leadhunters.BuildConfig
 import com.example.leadhunters.ui.components.AppCard
 import com.example.leadhunters.ui.theme.PrimaryRed
 
 @Composable
 fun MoreScreen(navController: NavController) {
+    val context = LocalContext.current
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -40,14 +45,7 @@ fun MoreScreen(navController: NavController) {
                     onClick = { navController.navigate("dial") }
                 )
             }
-            item {
-                MoreItem(
-                    icon = Icons.Default.Campaign,
-                    title = "Campaigns",
-                    subtitle = "Manage your calling campaigns",
-                    onClick = { /* TODO */ }
-                )
-            }
+
             item {
                 MoreItem(
                     icon = Icons.AutoMirrored.Filled.Message,
@@ -66,13 +64,35 @@ fun MoreScreen(navController: NavController) {
             }
             item {
                 MoreItem(
-                    icon = Icons.Default.TipsAndUpdates,
-                    title = "Optimization Guide",
-                    subtitle = "Ensure calls are recorded correctly",
-                    onClick = { /* TODO */ }
+                    icon = Icons.Default.SupportAgent,
+                    title = "Need Help? Call 7447328144",
+                    subtitle = "Tap to open the dialer",
+                    onClick = {
+                        val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:7447328144"))
+                        context.startActivity(intent)
+                    }
                 )
             }
+            item {
+                AppVersionInfo()
+            }
         }
+    }
+}
+
+@Composable
+fun AppVersionInfo() {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 12.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = "Version ${BuildConfig.VERSION_NAME} (Build ${BuildConfig.VERSION_CODE})",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 

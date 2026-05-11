@@ -48,42 +48,31 @@ class CallService : Service() {
         when (intent?.action) {
             ACTION_START_TRACKING -> {
                 val phoneNumber = intent.getStringExtra(EXTRA_PHONE_NUMBER) ?: ""
-                try {
-                    val notification = createNotification("Tracking call to $phoneNumber")
-                    
+                val notification = createNotification("Tracking call to $phoneNumber")
                     // Android 14 (API 34) and higher require specific permission checks before starting foreground service
                     val hasPhoneCallPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
                         androidx.core.content.ContextCompat.checkSelfPermission(
-                            this, "android.permission.FOREGROUND_SERVICE_PHONE_CALL"
+                            this, android.Manifest.permission.FOREGROUND_SERVICE_PHONE_CALL
                         ) == android.content.pm.PackageManager.PERMISSION_GRANTED
                     } else true
 
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                        try {
-                            if (hasPhoneCallPermission) {
-                                startForeground(
-                                    NOTIFICATION_ID, 
-                                    notification, 
-                                    android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_PHONE_CALL
-                                )
-                            } else {
-                                Log.w("CallService", "Missing FOREGROUND_SERVICE_PHONE_CALL permission, starting with default type")
-                                startForeground(NOTIFICATION_ID, notification)
-                            }
-                        } catch (e: Exception) {
-                            Log.w("CallService", "Failed to start with phoneCall type, falling back to default: ${e.message}")
-                            try {
-                                startForeground(NOTIFICATION_ID, notification)
-                            } catch (fallbackEx: Exception) {
-                                Log.e("CallService", "Total failure to start foreground service", fallbackEx)
-                            }
+                    try {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && hasPhoneCallPermission) {
+                            startForeground(
+                                NOTIFICATION_ID, 
+                                notification, 
+                                android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_PHONE_CALL
+                            )
+                        } else {
+                            startForeground(NOTIFICATION_ID, notification)
                         }
-                    } else {
-                        startForeground(NOTIFICATION_ID, notification)
+                    } catch (e: Exception) {
+                        Log.e("CallService", "Failed to start foreground service: ${e.message}")
+                        // Last ditch effort: start without type if it's not Android 14+ or if we failed
+                        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                           startForeground(NOTIFICATION_ID, notification)
+                        }
                     }
-                } catch (e: Exception) {
-                    Log.e("CallService", "Fatal error in onStartCommand foreground logic", e)
-                }
                 val leadId = intent.getStringExtra(EXTRA_LEAD_ID)
                 registerTracking(phoneNumber, leadId)
             }
