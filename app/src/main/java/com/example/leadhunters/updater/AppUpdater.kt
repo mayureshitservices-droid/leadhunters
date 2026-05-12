@@ -88,27 +88,40 @@ class AppUpdater @Inject constructor(
             var downloading = true
             while (downloading) {
                 val query = DownloadManager.Query().setFilterById(downloadId)
-                val cursor = downloadManager.query(query)
-                if (cursor != null && cursor.moveToFirst()) {
-                    val downloadedIdx = cursor.getColumnIndex(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR)
-                    val totalIdx = cursor.getColumnIndex(DownloadManager.COLUMN_TOTAL_SIZE_BYTES)
-                    val statusIdx = cursor.getColumnIndex(DownloadManager.COLUMN_STATUS)
-                    
-                    if (downloadedIdx != -1 && totalIdx != -1) {
-                        val bytesDownloaded = cursor.getInt(downloadedIdx)
-                        val bytesTotal = cursor.getInt(totalIdx)
+                downloadManager.query(query)?.use { cursor ->
+                    if (cursor.moveToFirst()) {
+                        val downloadedIdx = cursor.getColumnIndex(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR)
+                        val totalIdx = cursor.getColumnIndex(DownloadManager.COLUMN_TOTAL_SIZE_BYTES)
+                        val statusIdx = cursor.getColumnIndex(DownloadManager.COLUMN_STATUS)
                         
-                        if (statusIdx != -1 && cursor.getInt(statusIdx) == DownloadManager.STATUS_SUCCESSFUL) {
-                            downloading = false
-                            _downloadProgress.value = 100
-                        } else if (bytesTotal > 0) {
-                            val progress = (bytesDownloaded * 100L / bytesTotal).toInt()
-                            _downloadProgress.value = progress
+                        if (statusIdx != -1) {
+                            val status = cursor.getInt(statusIdx)
+                            val bytesTotal = if (totalIdx != -1) cursor.getInt(totalIdx) else 0
+
+                            if (status == DownloadManager.STATUS_SUCCESSFUL) {
+                                downloading = false
+                                _downloadProgress.value = 100
+                            } else if (status == DownloadManager.STATUS_FAILED) {
+                                downloading = false
+                                _downloadProgress.value = -1 // Signal failure
+                                android.util.Log.e("AppUpdater", "Download failed with status: $status")
+                            } else if (bytesTotal > 0 && downloadedIdx != -1) {
+                                val bytesDownloaded = cursor.getInt(downloadedIdx)
+                                val progress = (bytesDownloaded * 100L / bytesTotal).toInt()
+                                _downloadProgress.value = progress
+                            }
                         }
+                    } else {
+                        // Cursor is empty - something went wrong with the download ID
+                        downloading = false
+                        _downloadProgress.value = -1
                     }
-                    cursor.close()
+                } ?: run {
+                    // Query returned null
+                    downloading = false
+                    _downloadProgress.value = -1
                 }
-                delay(500)
+                delay(1000)
             }
         }
     }

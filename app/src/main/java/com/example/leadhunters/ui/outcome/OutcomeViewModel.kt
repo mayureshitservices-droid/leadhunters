@@ -13,7 +13,8 @@ import javax.inject.Inject
 
 @HiltViewModel
 class OutcomeViewModel @Inject constructor(
-    private val repository: CallRepository
+    private val repository: CallRepository,
+    private val autoDialManager: com.example.leadhunters.data.system.AutoDialManager
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<OutcomeUiState>(OutcomeUiState.Idle)
@@ -109,6 +110,9 @@ class OutcomeViewModel @Inject constructor(
                         payload = ""
                     )
                 )
+
+                // 4. Continue Auto-Dial if active
+                autoDialManager.onOutcomeSubmitted()
             } catch (e: Exception) {
                 _uiState.value = OutcomeUiState.Error("Failed to save outcome: ${e.message}", currentFormState ?: OutcomeUiState.Idle)
             }

@@ -40,12 +40,21 @@ class AutoDialManager @Inject constructor() {
         // SMART-SKIP: Automatically trigger next lead only if call was MISSED or REJECTED
         // If it was ANSWERED, we wait for the user to fill the outcome form manually.
         if (status == "MISSED" || status == "REJECTED") {
-            val nextLead = getNextLead()
-            if (nextLead != null) {
-                // Use a background scope to emit since this is called from Reconciler
-                kotlinx.coroutines.GlobalScope.launch {
-                    _autoDialEvents.emit(nextLead)
-                }
+            triggerNext()
+        }
+    }
+
+    fun onOutcomeSubmitted() {
+        if (!_isAutoDialActive.value) return
+        triggerNext()
+    }
+
+    private fun triggerNext() {
+        val nextLead = getNextLead()
+        if (nextLead != null) {
+            // Use a background scope to emit since this is called from various contexts
+            kotlinx.coroutines.GlobalScope.launch {
+                _autoDialEvents.emit(nextLead)
             }
         }
     }

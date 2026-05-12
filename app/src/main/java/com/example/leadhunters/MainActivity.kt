@@ -113,27 +113,35 @@ class MainActivity : ComponentActivity() {
                                 
                                 if (downloadProgress != null) {
                                     Spacer(modifier = Modifier.height(16.dp))
-                                    Text(
-                                        text = if (downloadProgress == 100) "Preparing installation..." else "Downloading... $downloadProgress%",
-                                        style = MaterialTheme.typography.labelMedium,
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    LinearProgressIndicator(
-                                        progress = (downloadProgress ?: 0).toFloat() / 100f,
-                                        modifier = Modifier.fillMaxWidth(),
-                                    )
+                                    if (downloadProgress == -1) {
+                                        Text(
+                                            "Download Failed! Please check your connection and try again.",
+                                            color = MaterialTheme.colorScheme.error,
+                                            style = MaterialTheme.typography.labelMedium
+                                        )
+                                    } else {
+                                        Text(
+                                            text = if (downloadProgress == 100) "Preparing installation..." else "Downloading... $downloadProgress%",
+                                            style = MaterialTheme.typography.labelMedium,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        LinearProgressIndicator(
+                                            progress = (downloadProgress ?: 0).toFloat() / 100f,
+                                            modifier = Modifier.fillMaxWidth(),
+                                        )
+                                    }
                                 }
                             }
                         },
                         confirmButton = {
                             Button(
-                                enabled = downloadProgress == null,
+                                enabled = downloadProgress == null || downloadProgress == -1,
                                 onClick = {
                                     appUpdater.downloadAndInstall(this@MainActivity, available.downloadUrl)
                                 }
                             ) {
-                                Text(if (downloadProgress != null) "Downloading..." else if (available.mandatory) "Update Now" else "Update")
+                                Text(if (downloadProgress != null && downloadProgress != -1) "Downloading..." else if (available.mandatory) "Update Now" else "Update")
                             }
                         },
                         dismissButton = {

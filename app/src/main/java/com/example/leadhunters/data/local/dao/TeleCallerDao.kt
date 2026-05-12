@@ -55,6 +55,9 @@ interface TeleCallerDao {
     @Update
     suspend fun updateCallLog(callLog: AppCallLog)
 
+    @Query("SELECT * FROM app_call_logs WHERE recordingPath IS NOT NULL AND startTime < :threshold")
+    suspend fun getLogsWithRecordingsOlderThan(threshold: Long): List<AppCallLog>
+
     // Outcomes
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertOutcome(outcome: CallOutcome): Long

@@ -53,9 +53,42 @@ class SyncWorker @AssistedInject constructor(
 
         if (successCount > 0) {
             teleCallerDao.purgeCompletedSyncItems()
+            // Run cleanup for old recordings
+            performRetentionCleanup()
         }
 
         return if (successCount == pendingItems.size) Result.success() else Result.retry()
+    }
+
+    private suspend fun performRetentionCleanup() {
+        try {
+            val sevenDaysAgo = System.currentTimeMillis() - (7 * 24 * 60 * 60 * 1000L)
+            val oldLogs = teleCallerDao.getLogsWithRecordingsOlderThan(sevenDaysAgo)
+            
+            if (oldLogs.isEmpty()) return
+            
+            Log.i("SyncWorker", "Starting retention cleanup for ${oldLogs.size} recordings...")
+            
+            var deletedCount = 0
+            for (log in oldLogs) {
+                val path = log.recordingPath ?: continue
+                val file = java.io.File(path)
+                
+                if (file.exists()) {
+                    if (file.delete()) {
+                        deletedCount++
+                        // Clear path in DB so UI knows it's gone
+                        teleCallerDao.updateCallLog(log.copy(recordingPath = null))
+                    }
+                } else {
+                    // File already gone, just clear the path
+                    teleCallerDao.updateCallLog(log.copy(recordingPath = null))
+                }
+            }
+            Log.i("SyncWorker", "Retention cleanup finished. Deleted $deletedCount files.")
+        } catch (e: Exception) {
+            Log.e("SyncWorker", "Error during retention cleanup: ${e.message}")
+        }
     }
 
     private fun showErrorNotification(title: String, message: String) {
@@ -98,24 +131,36 @@ class SyncWorker @AssistedInject constructor(
                         Log.i("SyncWorker", "Call log metadata synced. Server ID: $serverLogId")
                         
                         if (serverLogId != null && !callLog.recordingPath.isNullOrEmpty()) {
-                            // Safety: Wait a bit to ensure file is fully written by system
-                            delay(3000)
-                            
-                            val recordingResult = workRepository.uploadRecording(
-                                serverLogId = serverLogId,
-                                recordingPath = callLog.recordingPath
-                            )
-                            if (!recordingResult.isSuccess) {
-                                val error = recordingResult.exceptionOrNull()?.message ?: "Unknown Error"
-                                withContext(Dispatchers.Main) {
-                                    Toast.makeText(applicationContext, "Upload Failed: $error", Toast.LENGTH_LONG).show()
-                                }
-                                showErrorNotification("Recording Upload Failed", error)
-                                Log.e("SyncWorker", "Recording upload FAILED for server log $serverLogId: $error")
-                            } else {
-                                Log.i("SyncWorker", "Recording upload SUCCESS for server log $serverLogId")
+                            // Safety: Wait and retry for file to be flushed to storage (up to 3 attempts)
+                            var recordingFile = java.io.File(callLog.recordingPath)
+                            var attempts = 0
+                            while (!recordingFile.exists() && attempts < 3) {
+                                delay(2000) // Wait 2s between checks
+                                recordingFile = java.io.File(callLog.recordingPath)
+                                attempts++
                             }
-                            recordingResult.isSuccess
+                            
+                            if (recordingFile.exists()) {
+                                val recordingResult = workRepository.uploadRecording(
+                                    serverLogId = serverLogId,
+                                    recordingPath = callLog.recordingPath
+                                )
+                                if (!recordingResult.isSuccess) {
+                                    val error = recordingResult.exceptionOrNull()?.message ?: "Unknown Error"
+                                    withContext(Dispatchers.Main) {
+                                        Toast.makeText(applicationContext, "Upload Failed: $error", Toast.LENGTH_LONG).show()
+                                    }
+                                    showErrorNotification("Recording Upload Failed", error)
+                                    Log.e("SyncWorker", "Recording upload FAILED for server log $serverLogId: $error")
+                                } else {
+                                    Log.i("SyncWorker", "Recording upload SUCCESS for server log $serverLogId")
+                                }
+                                recordingResult.isSuccess
+                            } else {
+                                Log.e("SyncWorker", "Recording file NOT FOUND after retries at: ${callLog.recordingPath}")
+                                showErrorNotification("Recording Not Found", "Could not locate recording file after multiple attempts.")
+                                true // Consider it "synced" to avoid infinite retry of a non-existent file
+                            }
                         } else {
                             if (serverLogId == null) Log.w("SyncWorker", "Sync succeeded but no server ID returned!")
                             true 
