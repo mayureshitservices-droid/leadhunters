@@ -136,7 +136,9 @@ class CallService : Service() {
         when (state) {
             TelephonyManager.CALL_STATE_IDLE -> {
                 Log.d("CallService", "Call IDLE")
-                serviceScope.launch {
+                // Use GlobalScope here to ensure reconciliation finishes even if 
+                // the service is stopped (e.g. by starting the next call)
+                GlobalScope.launch {
                     delay(5000) // Give system 5s to finalize recording and log
                     reconciler.reconcile(targetNumber, leadId)
                 }

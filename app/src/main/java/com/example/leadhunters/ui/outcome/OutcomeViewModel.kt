@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.leadhunters.data.local.entities.CallOutcome
 import com.example.leadhunters.data.local.entities.Reminder
 import com.example.leadhunters.data.repository.CallRepository
+import com.example.leadhunters.data.system.CallReconciler
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -13,7 +14,8 @@ import javax.inject.Inject
 
 @HiltViewModel
 class OutcomeViewModel @Inject constructor(
-    private val repository: CallRepository
+    private val repository: CallRepository,
+    private val reconciler: CallReconciler
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<OutcomeUiState>(OutcomeUiState.Idle)
@@ -75,6 +77,10 @@ class OutcomeViewModel @Inject constructor(
 
         viewModelScope.launch {
             try {
+                // 0. Force immediate reconciliation to ensure status/duration are updated
+                // This prevents the "Pending" status on the dashboard
+                reconciler.reconcile(phoneNumber, leadId)
+
                 // 1. Save Outcome
                 repository.insertOutcome(
                     CallOutcome(
