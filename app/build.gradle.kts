@@ -23,8 +23,8 @@ android {
         applicationId = "com.example.leadhunters"
         minSdk = 24
         targetSdk = 35
-        versionCode = 15
-        versionName = "1.13"
+        versionCode = 17
+        versionName = "1.15"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

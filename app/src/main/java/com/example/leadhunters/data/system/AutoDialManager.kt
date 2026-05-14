@@ -1,6 +1,9 @@
 package com.example.leadhunters.data.system
 
 import com.example.leadhunters.data.local.entities.Lead
+import com.example.leadhunters.data.local.entities.CallOutcome
+import com.example.leadhunters.data.local.entities.SyncItem
+import com.example.leadhunters.data.repository.CallRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -11,14 +14,16 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class AutoDialManager @Inject constructor() {
+class AutoDialManager @Inject constructor(
+    private val repository: CallRepository
+) {
     private val _isAutoDialActive = MutableStateFlow(false)
     val isAutoDialActive = _isAutoDialActive.asStateFlow()
 
     private var currentQueue: List<Lead> = emptyList()
     private var currentIndex: Int = -1
 
-    private val _autoDialEvents = kotlinx.coroutines.flow.MutableSharedFlow<Lead>(replay = 0)
+    private val _autoDialEvents = MutableSharedFlow<Lead>(replay = 0)
     val autoDialEvents = _autoDialEvents.asSharedFlow()
 
     fun startAutoDial(leads: List<Lead>, startIndex: Int = 0) {
@@ -34,16 +39,44 @@ class AutoDialManager @Inject constructor() {
         currentIndex = -1
     }
 
-    fun onCallEnded(status: String) {
+    fun onCallEnded(status: String, callLogId: Long) {
         if (!_isAutoDialActive.value) return
         
-        // SMART-SKIP: Automatically trigger next lead only if call was MISSED or REJECTED
-        // If it was ANSWERED, we wait for the user to fill the outcome form manually.
-        if (status == "MISSED" || status == "REJECTED") {
-            val nextLead = getNextLead()
-            if (nextLead != null) {
-                // Use a background scope to emit since this is called from Reconciler
-                kotlinx.coroutines.GlobalScope.launch {
+        // SMART-SKIP: Automatically trigger next lead only if call was NOT ANSWERED
+        // This covers MISSED, REJECTED, and carrier messages (if reconciliation logic allows)
+        if (status != "ANSWERED") {
+            val currentLead = if (currentIndex >= 0 && currentIndex < currentQueue.size) {
+                currentQueue[currentIndex]
+            } else null
+
+            // Use a background scope to save outcome and emit next lead
+            GlobalScope.launch {
+                if (currentLead != null) {
+                    // 1. Automatically save outcome for unanswered call
+                    repository.insertOutcome(
+                        CallOutcome(
+                            callLogId = callLogId,
+                            leadId = currentLead.id,
+                            customerName = currentLead.name,
+                            outcomeType = status,
+                            remarks = "Auto-logged (Unanswered)"
+                        )
+                    )
+                    
+                    // 2. Enqueue Sync
+                    repository.enqueueSync(
+                        SyncItem(
+                            type = "CALL_LOG",
+                            referenceId = callLogId.toString(),
+                            operation = "UPDATE",
+                            payload = ""
+                        )
+                    )
+                }
+
+                // 3. Move to next lead
+                val nextLead = getNextLead()
+                if (nextLead != null) {
                     _autoDialEvents.emit(nextLead)
                 }
             }

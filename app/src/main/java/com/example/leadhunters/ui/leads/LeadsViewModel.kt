@@ -115,6 +115,7 @@ class LeadsViewModel @Inject constructor(
     init {
         refreshLeads()
         observeAutoDialEvents()
+        observeAutoDialProgress()
     }
 
     private fun observeAutoDialEvents() {
@@ -132,21 +133,30 @@ class LeadsViewModel @Inject constructor(
     }
 
     private fun observeAutoDialProgress() {
-        // This is now partially handled by AutoDialManager's onCallEnded
-        // But we still monitor answered calls for auto-navigation
         viewModelScope.launch {
             uiState.collect { state ->
                 if (!autoDialManager.isActive()) return@collect
 
                 val currentLeadId = lastProcessedLeadId ?: return@collect
-                val currentLeadWithLog = state.leads.find { it.lead.id == currentLeadId } ?: return@collect
-                val latestLog = currentLeadWithLog.latestLog ?: return@collect
+                val currentLeadWithLog = state.leads.find { it.lead.id == currentLeadId }
+                
+                if (currentLeadWithLog != null) {
+                    val latestLog = currentLeadWithLog.latestLog ?: return@collect
 
-                if (latestLog.id != lastProcessedLogId && !isTransitioning) {
-                    if (latestLog.status == "ANSWERED") {
-                        lastProcessedLogId = latestLog.id
-                        _autoNavigateEvent.send(latestLog.id)
+                    if (latestLog.id != lastProcessedLogId && !isTransitioning) {
+                        if (latestLog.status == "ANSWERED") {
+                            lastProcessedLogId = latestLog.id
+                            _autoNavigateEvent.send(latestLog.id)
+                        }
                     }
+                } else if (!isTransitioning) {
+                    // Lead is no longer in the pending list (likely form submitted)
+                    // We only trigger next if we were actually tracking this lead
+                    lastProcessedLeadId = null
+                    lastProcessedLogId = null
+                    
+                    delay(800) // UI stability delay
+                    triggerNextAutoDial()
                 }
             }
         }

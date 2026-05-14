@@ -133,7 +133,7 @@ class CallReconciler @Inject constructor(
                             analyticsHelper.logReconciliation(phoneNumber, true, "Matched system ID $systemId")
                             
                             // Smart-Skip trigger
-                            autoDialManager.onCallEnded(status)
+                            autoDialManager.onCallEnded(status, pendingLog.id)
                             
                             break // Stop after first match
                         }
