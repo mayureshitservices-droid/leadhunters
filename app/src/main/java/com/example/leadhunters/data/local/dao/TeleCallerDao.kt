@@ -55,6 +55,9 @@ interface TeleCallerDao {
     @Update
     suspend fun updateCallLog(callLog: AppCallLog)
 
+    @Query("SELECT EXISTS(SELECT 1 FROM app_call_logs WHERE systemCallLogId = :systemId)")
+    suspend fun isSystemCallLogReconciled(systemId: Long): Boolean
+
     // Outcomes
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertOutcome(outcome: CallOutcome): Long
@@ -104,10 +107,10 @@ interface TeleCallerDao {
     // Analytics Dashboard Queries
     @Query("""
         SELECT 
-            COUNT(*) as totalCalls,
-            SUM(CASE WHEN status = 'ANSWERED' THEN 1 ELSE 0 END) as answered,
-            SUM(CASE WHEN status = 'MISSED' THEN 1 ELSE 0 END) as missed,
-            SUM(CASE WHEN status = 'REJECTED' THEN 1 ELSE 0 END) as rejected,
+            COUNT(CASE WHEN status != 'PENDING' THEN 1 END) as totalCalls,
+            COUNT(CASE WHEN status = 'ANSWERED' THEN 1 END) as answered,
+            COUNT(CASE WHEN status = 'MISSED' THEN 1 END) as missed,
+            COUNT(CASE WHEN status = 'REJECTED' THEN 1 END) as rejected,
             SUM(duration) as totalDuration
         FROM app_call_logs 
         WHERE startTime >= :startOfDay
@@ -116,10 +119,10 @@ interface TeleCallerDao {
 
     @Query("""
         SELECT 
-            COUNT(*) as totalCalls,
-            SUM(CASE WHEN status = 'ANSWERED' THEN 1 ELSE 0 END) as answered,
-            SUM(CASE WHEN status = 'MISSED' THEN 1 ELSE 0 END) as missed,
-            SUM(CASE WHEN status = 'REJECTED' THEN 1 ELSE 0 END) as rejected,
+            COUNT(CASE WHEN status != 'PENDING' THEN 1 END) as totalCalls,
+            COUNT(CASE WHEN status = 'ANSWERED' THEN 1 END) as answered,
+            COUNT(CASE WHEN status = 'MISSED' THEN 1 END) as missed,
+            COUNT(CASE WHEN status = 'REJECTED' THEN 1 END) as rejected,
             SUM(duration) as totalDuration
         FROM app_call_logs 
         WHERE startTime >= :startOfMonth

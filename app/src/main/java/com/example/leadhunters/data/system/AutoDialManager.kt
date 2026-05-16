@@ -49,7 +49,7 @@ class AutoDialManager @Inject constructor(
                 currentQueue[currentIndex]
             } else null
 
-            // Use a background scope to save outcome and emit next lead
+            // Use a background scope to save outcome
             GlobalScope.launch {
                 if (currentLead != null) {
                     // 1. Automatically save outcome for unanswered call
@@ -73,12 +73,7 @@ class AutoDialManager @Inject constructor(
                         )
                     )
                 }
-
-                // 3. Move to next lead
-                val nextLead = getNextLead()
-                if (nextLead != null) {
-                    _autoDialEvents.emit(nextLead)
-                }
+                // Next lead will be triggered by LeadsViewModel observing the UI state change
             }
         }
     }

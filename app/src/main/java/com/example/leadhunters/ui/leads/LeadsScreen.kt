@@ -99,6 +99,14 @@ fun LeadsScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.padding(end = 8.dp)
                     ) {
+                        IconButton(onClick = { viewModel.refreshLeads() }) {
+                            Icon(
+                                Icons.Default.Refresh,
+                                contentDescription = "Refresh",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                        
                         Text(
                             text = "Auto-Dial",
                             style = MaterialTheme.typography.labelMedium,
@@ -278,7 +286,7 @@ fun LeadItemCard(
 ) {
     val lead = item.lead
     val latestLog = item.latestLog
-    val hasLog = latestLog != null
+    val hasLog = latestLog != null && latestLog.status != "PENDING"
     val hasRecording = latestLog?.recordingPath != null && File(latestLog.recordingPath!!).exists()
     val isCurrentlyPlaying = playbackState.currentLogId == latestLog?.id && playbackState.isPlaying
 

@@ -33,7 +33,7 @@ class CallReconciler @Inject constructor(
             
             Log.i("CallReconciler", "Attempting reconcile for ${pendingLogs.size} logs for $phoneNumber")
             
-            for (pendingLog in pendingLogs) {
+            reconcileLoop@for (pendingLog in pendingLogs) {
                 // Re-verify it's still unreconciled (to prevent double-processing from parallel calls)
                 val currentStatus = repository.getLogById(pendingLog.id)
                 if (currentStatus == null || currentStatus.isReconciled) {
@@ -49,8 +49,8 @@ class CallReconciler @Inject constructor(
                         "${CallLog.Calls.DATE} DESC"
                     )
 
+                    var matchedInCursor = false
                     cursor?.use {
-                        var matched = false
                         while (it.moveToNext()) {
                             val durationIdx = it.getColumnIndex(CallLog.Calls.DURATION)
                             val typeIdx = it.getColumnIndex(CallLog.Calls.TYPE)
@@ -68,11 +68,18 @@ class CallReconciler @Inject constructor(
                             }
                             
                             // Found a match!
-                            matched = true
+                            val systemId = it.getLong(idIdx)
+
+                            // PREVENT DUPLICATION: If this system log entry has already been used, skip it
+                            if (repository.isSystemCallLogReconciled(systemId)) {
+                                Log.d("CallReconciler", "System log ID $systemId already reconciled, skipping")
+                                continue
+                            }
+
+                            matchedInCursor = true
                             val duration = it.getLong(durationIdx)
                             val type = it.getInt(typeIdx)
                             val date = it.getLong(dateIdx)
-                            val systemId = it.getLong(idIdx)
 
                             val status = when (type) {
                                 CallLog.Calls.OUTGOING_TYPE -> if (duration > 1L) "ANSWERED" else "REJECTED"
@@ -124,7 +131,7 @@ class CallReconciler @Inject constructor(
                                 com.example.leadhunters.data.local.entities.SyncItem(
                                     type = "CALL_LOG",
                                     referenceId = pendingLog.id.toString(),
-                                    operation = "CREATE",
+                                    operation = "UPDATE",
                                     payload = "" 
                                 )
                             )
@@ -135,13 +142,18 @@ class CallReconciler @Inject constructor(
                             // Smart-Skip trigger
                             autoDialManager.onCallEnded(status, pendingLog.id)
                             
-                            break // Stop after first match
+                            break // Stop looking at system logs for this pending log
                         }
-                        
-                        if (!matched) {
-                            Log.i("CallReconciler", "No matching call found in system log for $phoneNumber")
-                            analyticsHelper.logReconciliation(phoneNumber, false, "No matching number in recent calls")
-                        }
+                    }
+
+                    if (matchedInCursor) {
+                        // IMPORTANT: Once we've reconciled ONE pending log for this trigger, 
+                        // stop and wait for the next trigger. This prevents one system call 
+                        // from being assigned to multiple pending logs.
+                        break@reconcileLoop
+                    } else {
+                        Log.i("CallReconciler", "No matching call found in system log for $phoneNumber")
+                        analyticsHelper.logReconciliation(phoneNumber, false, "No matching number in recent calls")
                     }
                 } catch (e: SecurityException) {
                     Log.e("CallReconciler", "Permission denied querying CallLog for $phoneNumber", e)

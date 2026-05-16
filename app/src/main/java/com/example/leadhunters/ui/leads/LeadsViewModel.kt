@@ -1,5 +1,6 @@
 package com.example.leadhunters.ui.leads
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.leadhunters.data.local.entities.Lead
@@ -7,6 +8,7 @@ import com.example.leadhunters.data.repository.CallRepository
 import com.example.leadhunters.data.repository.WorkRepository
 import com.example.leadhunters.util.AnalyticsHelper
 import com.example.leadhunters.data.local.dao.TeleCallerDao
+import com.example.leadhunters.data.system.CallReconciler
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
@@ -41,6 +43,7 @@ class LeadsViewModel @Inject constructor(
     private val callRepository: CallRepository,
     private val teleCallerDao: TeleCallerDao,
     private val analyticsHelper: AnalyticsHelper,
+    private val reconciler: CallReconciler,
     val playbackManager: com.example.leadhunters.ui.logs.CallPlaybackManager,
     private val autoDialManager: com.example.leadhunters.data.system.AutoDialManager
 ) : ViewModel() {
@@ -149,9 +152,10 @@ class LeadsViewModel @Inject constructor(
                             _autoNavigateEvent.send(latestLog.id)
                         }
                     }
-                } else if (!isTransitioning) {
-                    // Lead is no longer in the pending list (likely form submitted)
-                    // We only trigger next if we were actually tracking this lead
+                } else if (!isTransitioning && lastProcessedLeadId != null) {
+                    // Safety: Only auto-trigger next if we can't find the current lead 
+                    // AND we haven't already started transitioning.
+                    // We also clear the ID to prevent multiple triggers from the same state emission.
                     lastProcessedLeadId = null
                     lastProcessedLogId = null
                     
@@ -216,7 +220,26 @@ class LeadsViewModel @Inject constructor(
             _error.value = null
             workRepository.syncLeads()
                 .onFailure { _error.value = it.message }
+            
+            // Manual "Pull-to-Refresh" Auto-healing Sweep
+            // Scans for any stuck "Pending" logs from interrupted sessions
+            performReconciliationSweep()
+            
             _isLoading.value = false
+        }
+    }
+
+    private suspend fun performReconciliationSweep() {
+        try {
+            val pendingLogs = callRepository.getAllUnreconciledLogs()
+            if (pendingLogs.isNotEmpty()) {
+                pendingLogs.forEach { log ->
+                    // Reconcile each stuck log in the background
+                    reconciler.reconcile(log.phoneNumber, log.leadId)
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("LeadsViewModel", "ReconciliationSweep failed", e)
         }
     }
 

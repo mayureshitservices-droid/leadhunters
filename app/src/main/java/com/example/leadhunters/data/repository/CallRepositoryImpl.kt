@@ -67,6 +67,10 @@ class CallRepositoryImpl @Inject constructor(
         teleCallerDao.updateCallLog(callLog)
     }
 
+    override suspend fun isSystemCallLogReconciled(systemId: Long): Boolean {
+        return teleCallerDao.isSystemCallLogReconciled(systemId)
+    }
+
     override suspend fun getLatestUnreconciled(number: String): AppCallLog? {
         return teleCallerDao.getLatestUnreconciledLogForNumber(number)
     }

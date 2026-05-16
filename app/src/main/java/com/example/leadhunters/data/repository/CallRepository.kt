@@ -14,6 +14,7 @@ interface CallRepository {
     suspend fun finalizeCall(callLogId: Long, duration: Long, status: String, systemCallLogId: Long? = null)
     suspend fun getLogById(id: Long): AppCallLog?
     suspend fun updateLog(callLog: AppCallLog)
+    suspend fun isSystemCallLogReconciled(systemId: Long): Boolean
     suspend fun getLatestUnreconciled(number: String): AppCallLog?
     suspend fun getUnreconciledLogsForNumber(number: String): List<AppCallLog>
     suspend fun getAllUnreconciledLogs(): List<AppCallLog>
