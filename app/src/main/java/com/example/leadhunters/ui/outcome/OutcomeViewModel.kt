@@ -59,18 +59,19 @@ class OutcomeViewModel @Inject constructor(
         reminderTimestamp: Long?
     ) {
         val currentFormState = _uiState.value as? OutcomeUiState.Form
+        val isReminderType = type == "Remind later" || type == "Bank PTP" || type == "FPTP" || type == "PTP" || type == "RTP"
 
         if (customerName.isBlank()) {
             _uiState.value = OutcomeUiState.Error("Please enter customer name", currentFormState ?: OutcomeUiState.Idle)
             return
         }
 
-        if (type == "Remind later" && reminderTimestamp == null) {
+        if (isReminderType && reminderTimestamp == null) {
             _uiState.value = OutcomeUiState.Error("Please select reminder date and time", currentFormState ?: OutcomeUiState.Idle)
             return
         }
 
-        if (type != "Remind later" && remarks.isNullOrBlank()) {
+        if (!isReminderType && remarks.isNullOrBlank()) {
             _uiState.value = OutcomeUiState.Error("Please enter remarks", currentFormState ?: OutcomeUiState.Idle)
             return
         }
@@ -94,7 +95,7 @@ class OutcomeViewModel @Inject constructor(
                 )
 
                 // 2. If it's a reminder, save it to the reminders table too
-                if (type == "Remind later" && reminderTimestamp != null) {
+                if (isReminderType && reminderTimestamp != null) {
                     repository.insertReminder(
                         Reminder(
                             customerName = customerName,
@@ -104,9 +105,12 @@ class OutcomeViewModel @Inject constructor(
                     )
                 }
 
+                // 3. Update outcome in processed_leads
+                repository.updateProcessedLeadOutcome(callId, type)
+
                 _uiState.value = OutcomeUiState.Success
                 
-                // 3. Enqueue Sync for the call log (SyncWorker will now fetch the outcome)
+                // 4. Enqueue Sync for the call log (SyncWorker will now fetch the outcome)
                 repository.enqueueSync(
                     com.example.leadhunters.data.local.entities.SyncItem(
                         type = "CALL_LOG",

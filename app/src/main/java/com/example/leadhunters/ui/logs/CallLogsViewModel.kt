@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.leadhunters.data.local.entities.AppCallLog
 import com.example.leadhunters.data.repository.CallRepository
+import com.example.leadhunters.data.system.CallReconciler
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import javax.inject.Inject
@@ -11,6 +12,7 @@ import javax.inject.Inject
 @HiltViewModel
 class CallLogsViewModel @Inject constructor(
     private val repository: CallRepository,
+    private val reconciler: CallReconciler,
     val playbackManager: CallPlaybackManager
 ) : ViewModel() {
 
@@ -37,6 +39,8 @@ class CallLogsViewModel @Inject constructor(
     }
 
     suspend fun startCall(phoneNumber: String): Long {
-        return repository.startCall(leadId = null, phoneNumber = phoneNumber)
+        val callLogId = repository.startCall(leadId = null, phoneNumber = phoneNumber)
+        reconciler.reconcile(phoneNumber, null)
+        return callLogId
     }
 }

@@ -10,21 +10,32 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.example.leadhunters.R
 import com.example.leadhunters.data.repository.CallRepository
+import com.example.leadhunters.data.repository.WorkRepository
 import com.example.leadhunters.data.system.CallLogObserver
 import com.example.leadhunters.data.system.CallReconciler
+import com.example.leadhunters.data.system.RecordingFileWatcher
+import com.example.leadhunters.data.system.RecordingScanner
 import dagger.hilt.android.AndroidEntryPoint
-import kotlinx.coroutines.*
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.cancel
 import javax.inject.Inject
 
 @AndroidEntryPoint
 class CallService : Service() {
 
     @Inject lateinit var repository: CallRepository
+    @Inject lateinit var workRepository: WorkRepository
     @Inject lateinit var reconciler: CallReconciler
+    @Inject lateinit var recordingScanner: RecordingScanner
     @Inject lateinit var playbackManager: com.example.leadhunters.ui.logs.CallPlaybackManager
     
     private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var callLogObserver: CallLogObserver? = null
+    private var recordingWatcher: RecordingFileWatcher? = null
     private lateinit var telephonyManager: TelephonyManager
     private var callback: Any? = null
 
@@ -49,30 +60,26 @@ class CallService : Service() {
             ACTION_START_TRACKING -> {
                 val phoneNumber = intent.getStringExtra(EXTRA_PHONE_NUMBER) ?: ""
                 val notification = createNotification("Tracking call to $phoneNumber")
-                    // Android 14 (API 34) and higher require specific permission checks before starting foreground service
-                    val hasPhoneCallPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                        androidx.core.content.ContextCompat.checkSelfPermission(
-                            this, android.Manifest.permission.FOREGROUND_SERVICE_PHONE_CALL
-                        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
-                    } else true
+                val hasPhoneCallPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                    androidx.core.content.ContextCompat.checkSelfPermission(
+                        this, android.Manifest.permission.FOREGROUND_SERVICE_PHONE_CALL
+                    ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                } else true
 
-                    try {
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && hasPhoneCallPermission) {
-                            startForeground(
-                                NOTIFICATION_ID, 
-                                notification, 
-                                android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_PHONE_CALL
-                            )
-                        } else {
-                            startForeground(NOTIFICATION_ID, notification)
-                        }
-                    } catch (e: Exception) {
-                        Log.e("CallService", "Failed to start foreground service: ${e.message}")
-                        // Last ditch effort: start without type if it's not Android 14+ or if we failed
-                        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                           startForeground(NOTIFICATION_ID, notification)
-                        }
+                try {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && hasPhoneCallPermission) {
+                        startForeground(
+                            NOTIFICATION_ID, notification,
+                            android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_PHONE_CALL
+                        )
+                    } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        startForeground(NOTIFICATION_ID, notification)
+                    } else {
+                        startForeground(NOTIFICATION_ID, notification)
                     }
+                } catch (e: Exception) {
+                    Log.e("CallService", "Failed to start foreground service, continuing without: ${e.message}")
+                }
                 val leadId = intent.getStringExtra(EXTRA_LEAD_ID)
                 registerTracking(phoneNumber, leadId)
             }
@@ -109,6 +116,8 @@ class CallService : Service() {
             Log.e("CallService", "Missing READ_PHONE_STATE permission.", e)
         }
 
+        startRecordingWatcher()
+
         callLogObserver = CallLogObserver(this) { 
             serviceScope.launch {
                 reconciler.reconcile(targetNumber, leadId)
@@ -117,7 +126,21 @@ class CallService : Service() {
         callLogObserver?.register()
     }
 
+    private fun startRecordingWatcher() {
+        val absolutePaths = RecordingScanner.getAbsoluteOemPaths()
+        val watcher = RecordingFileWatcher(absolutePaths)
+        watcher.onFileDiscovered = { path ->
+            recordingScanner.addCandidatePath(path)
+        }
+        watcher.startWatching()
+        recordingWatcher = watcher
+    }
+
     private fun unregisterTracking() {
+        recordingWatcher?.stopWatching()
+        recordingWatcher = null
+        recordingScanner.clearCandidatePaths()
+
         callLogObserver?.unregister()
         callLogObserver = null
 
@@ -134,18 +157,20 @@ class CallService : Service() {
 
     private fun handleCallStateChange(state: Int, targetNumber: String, leadId: String?) {
         when (state) {
-            TelephonyManager.CALL_STATE_IDLE -> {
-                Log.d("CallService", "Call IDLE")
-                // Use GlobalScope here to ensure reconciliation finishes even if 
-                // the service is stopped (e.g. by starting the next call)
-                GlobalScope.launch {
-                    delay(5000) // Give system 5s to finalize recording and log
-                    reconciler.reconcile(targetNumber, leadId)
+                TelephonyManager.CALL_STATE_IDLE -> {
+                    Log.d("CallService", "Call IDLE")
+                    serviceScope.launch {
+                        workRepository.updateTelecallerStatus("idle")
+                        delay(5000)
+                        reconciler.reconcile(targetNumber, leadId)
+                    }
                 }
-            }
             TelephonyManager.CALL_STATE_OFFHOOK -> {
                 Log.d("CallService", "Call OFFHOOK (Active)")
                 playbackManager.stop()
+                serviceScope.launch {
+                    workRepository.updateTelecallerStatus("on_call")
+                }
             }
             TelephonyManager.CALL_STATE_RINGING -> {
                 Log.d("CallService", "Call RINGING")

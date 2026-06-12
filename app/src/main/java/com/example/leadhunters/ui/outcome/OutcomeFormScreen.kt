@@ -94,7 +94,7 @@ fun OutcomeForm(
     onSubmit: (String, String, String?, Long?) -> Unit
 ) {
     var customerName by rememberSaveable { mutableStateOf(initialName) }
-    var selectedType by rememberSaveable { mutableStateOf("Interested") }
+    var selectedType by rememberSaveable { mutableStateOf("Lost") }
     var remarks by rememberSaveable { mutableStateOf("") }
     var expanded by remember { mutableStateOf(false) } // This one is fine to reset
     
@@ -108,10 +108,7 @@ fun OutcomeForm(
     var showTimePicker by rememberSaveable { mutableStateOf(false) }
 
     val types = listOf(
-        "Interested", 
-        "Ordered", 
-        "Booked", 
-        "Remind later", 
+        "Remind later",
         "Lost",
         "CB Request",
         "Left Msg",
@@ -129,9 +126,22 @@ fun OutcomeForm(
         "Already Paid",
         "Death",
         "CSWN",
-        "RTP"
+        "RTP",
+        "Interested",
+        "Hot Lead",
+        "Walk-In",
+        "Callback",
+        "Follow-Up",
+        "Warm Lead",
+        "Budget Issue",
+        "Pending Decision",
+        "Online",
+        "Existing Student",
+        "Not Interested",
+        "Language Issue",
+        "Sale Done"
     )
-    val isReminder = selectedType == "Remind later"
+    val isReminder = selectedType == "Remind later" || selectedType == "Bank PTP" || selectedType == "FPTP" || selectedType == "PTP" || selectedType == "RTP"
 
     val dateFormatter = remember { SimpleDateFormat("dd MMM yyyy", Locale.getDefault()) }
 

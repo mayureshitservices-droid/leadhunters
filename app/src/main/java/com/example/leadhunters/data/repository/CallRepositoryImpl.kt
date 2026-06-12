@@ -1,12 +1,15 @@
 package com.example.leadhunters.data.repository
 
 import android.content.Context
+import androidx.work.Constraints
 import androidx.work.ExistingWorkPolicy
+import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import com.example.leadhunters.data.local.dao.TeleCallerDao
 import com.example.leadhunters.data.local.entities.AppCallLog
 import com.example.leadhunters.data.local.entities.Lead
+import com.example.leadhunters.data.local.entities.ProcessedLead
 import com.example.leadhunters.data.local.entities.Reminder
 import com.example.leadhunters.worker.SyncWorker
 import com.example.leadhunters.util.AnalyticsHelper
@@ -48,7 +51,7 @@ class CallRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun finalizeCall(callLogId: Long, duration: Long, status: String, systemCallLogId: Long?) {
+    override suspend fun finalizeCall(callLogId: Long, duration: Long, status: String, systemCallLogId: Long?, recordingPath: String?) {
         val log = teleCallerDao.getCallLogById(callLogId)
         if (log != null) {
             teleCallerDao.updateCallLog(log.copy(
@@ -56,7 +59,8 @@ class CallRepositoryImpl @Inject constructor(
                 duration = duration,
                 status = status,
                 systemCallLogId = systemCallLogId,
-                isReconciled = true
+                isReconciled = true,
+                recordingPath = recordingPath ?: log.recordingPath
             ))
         }
     }
@@ -96,10 +100,15 @@ class CallRepositoryImpl @Inject constructor(
     }
 
     private fun triggerSyncWorker() {
-        val request = OneTimeWorkRequestBuilder<SyncWorker>().build()
+        val constraints = Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.CONNECTED)
+            .build()
+        val request = OneTimeWorkRequestBuilder<SyncWorker>()
+            .setConstraints(constraints)
+            .build()
         WorkManager.getInstance(context).enqueueUniqueWork(
             "CallSyncWorker",
-            ExistingWorkPolicy.APPEND_OR_REPLACE,
+            ExistingWorkPolicy.KEEP,
             request
         )
     }
@@ -107,5 +116,15 @@ class CallRepositoryImpl @Inject constructor(
     override suspend fun enqueueSync(item: com.example.leadhunters.data.local.entities.SyncItem) {
         teleCallerDao.insertSyncItem(item)
         triggerSyncWorker()
+    }
+
+    override fun getProcessedLeads(): Flow<List<ProcessedLead>> = teleCallerDao.getAllProcessedLeads()
+
+    override suspend fun insertProcessedLead(processedLead: ProcessedLead) {
+        teleCallerDao.insertProcessedLead(processedLead)
+    }
+
+    override suspend fun updateProcessedLeadOutcome(callLogId: Long, outcome: String) {
+        teleCallerDao.updateProcessedLeadOutcome(callLogId, outcome)
     }
 }

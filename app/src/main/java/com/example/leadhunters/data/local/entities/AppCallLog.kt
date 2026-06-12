@@ -9,7 +9,10 @@ import androidx.room.Index
     tableName = "app_call_logs",
     indices = [
         Index(value = ["startTime"]),
-        Index(value = ["phoneNumber"])
+        Index(value = ["phoneNumber"]),
+        Index(value = ["isReconciled"]),
+        Index(value = ["leadId"]),
+        Index(value = ["systemCallLogId"])
     ]
 )
 data class AppCallLog(

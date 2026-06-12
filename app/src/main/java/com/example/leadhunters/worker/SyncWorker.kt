@@ -10,10 +10,6 @@ import com.example.leadhunters.data.local.entities.SyncItem
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import kotlinx.coroutines.flow.first
-import android.widget.Toast
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import androidx.core.app.NotificationCompat
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -81,7 +77,13 @@ class SyncWorker @AssistedInject constructor(
     private suspend fun processSyncItem(item: SyncItem): Boolean {
         return when (item.type) {
             "CALL_LOG" -> {
-                val callLog = teleCallerDao.getCallLogById(item.referenceId.toLong())
+                val logId = try {
+                    item.referenceId.toLong()
+                } catch (e: NumberFormatException) {
+                    Log.e("SyncWorker", "Invalid referenceId: ${item.referenceId}")
+                    return@processSyncItem false
+                }
+                val callLog = teleCallerDao.getCallLogById(logId)
                 if (callLog != null) {
                     val outcome = teleCallerDao.getOutcomeForCall(callLog.id)
                     val syncResult = workRepository.syncCallLog(
@@ -90,7 +92,8 @@ class SyncWorker @AssistedInject constructor(
                         durationSeconds = callLog.duration?.toInt() ?: 0,
                         callStatus = callLog.status,
                         outcome = outcome?.outcomeType,
-                        notes = outcome?.remarks
+                        notes = outcome?.remarks,
+                        nextReminderTime = outcome?.nextReminderTime
                     )
                     
                     if (syncResult.isSuccess) {
@@ -98,18 +101,12 @@ class SyncWorker @AssistedInject constructor(
                         Log.i("SyncWorker", "Call log metadata synced. Server ID: $serverLogId")
                         
                         if (serverLogId != null && !callLog.recordingPath.isNullOrEmpty()) {
-                            // Safety: Wait a bit to ensure file is fully written by system
-                            delay(3000)
-                            
                             val recordingResult = workRepository.uploadRecording(
                                 serverLogId = serverLogId,
                                 recordingPath = callLog.recordingPath
                             )
                             if (!recordingResult.isSuccess) {
                                 val error = recordingResult.exceptionOrNull()?.message ?: "Unknown Error"
-                                withContext(Dispatchers.Main) {
-                                    Toast.makeText(applicationContext, "Upload Failed: $error", Toast.LENGTH_LONG).show()
-                                }
                                 showErrorNotification("Recording Upload Failed", error)
                                 Log.e("SyncWorker", "Recording upload FAILED for server log $serverLogId: $error")
                             } else {
@@ -122,9 +119,6 @@ class SyncWorker @AssistedInject constructor(
                         }
                     } else {
                         val error = syncResult.exceptionOrNull()?.message ?: "Unknown Error"
-                        withContext(Dispatchers.Main) {
-                            Toast.makeText(applicationContext, "Sync Failed: $error", Toast.LENGTH_LONG).show()
-                        }
                         showErrorNotification("Call Sync Failed", error)
                         Log.e("SyncWorker", "Call log metadata sync FAILED: $error")
                         false

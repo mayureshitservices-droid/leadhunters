@@ -5,8 +5,14 @@ import android.util.Log
 import com.example.leadhunters.data.local.entities.Lead
 import com.example.leadhunters.data.remote.api.WorkApiService
 import com.example.leadhunters.data.remote.model.CallLogSyncRequest
+import com.example.leadhunters.data.remote.model.CampaignDto
+import com.example.leadhunters.data.remote.model.ClaimCampaignRequest
+import com.example.leadhunters.data.remote.model.TelecallerStatusRequest
 import com.example.leadhunters.util.AnalyticsHelper
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.asRequestBody
@@ -23,26 +29,49 @@ class WorkRepositoryImpl @Inject constructor(
 
     override fun getLeads(): Flow<List<Lead>> = teleCallerDao.getAllLeads()
 
-    override suspend fun syncLeads(): Result<Unit> {
-        return try {
-            val response = apiService.getLeads()
+    override fun getCampaigns(): Flow<Result<List<CampaignDto>>> = flow {
+        try {
+            val response = apiService.getCampaigns()
             if (response.isSuccessful) {
-                val leadsDto = response.body()?.leads ?: emptyList()
-                val entities = leadsDto.map { dto ->
-                    Lead(
-                        id = dto.id,
-                        name = dto.name,
-                        phoneNumber = dto.phone,
-                        status = dto.status,
-                        businessOwnerId = dto.businessOwnerId,
-                        businessOwnerName = dto.businessOwnerName,
-                        additionalData = dto.additionalData
-                    )
-                }
-                teleCallerDao.insertLeads(entities)
-                Result.success(Unit)
+                emit(Result.success(response.body()?.campaigns ?: emptyList()))
             } else {
-                Result.failure(Exception("Failed to fetch leads: ${response.message()}"))
+                emit(Result.failure(Exception("Failed to fetch campaigns: ${response.message()}")))
+            }
+        } catch (e: Exception) {
+            emit(Result.failure(e))
+        }
+    }
+
+    override suspend fun claimCampaign(campaignName: String): Result<Int> {
+        return try {
+            val request = ClaimCampaignRequest(campaignName = campaignName)
+            val response = apiService.claimCampaign(request)
+            if (response.isSuccessful) {
+                val successResponse = response.body()
+                if (successResponse?.success == true) {
+                    val serverLeads = successResponse.leads
+                    if (serverLeads != null) {
+                        val entities = serverLeads.map { dto ->
+                            Lead(
+                                id = dto.id,
+                                name = dto.name,
+                                phoneNumber = dto.phone,
+                                status = dto.status,
+                                businessOwnerId = dto.businessOwnerId,
+                                campaignName = dto.campaignName ?: campaignName,
+                                additionalData = dto.additionalData
+                            )
+                        }
+                        teleCallerDao.clearAndInsertLeads(entities)
+                    } else {
+                        Log.w("WorkRepository", "claimCampaign success but no leads returned for campaign: $campaignName")
+                    }
+                    Result.success(successResponse.claimedCount)
+                } else {
+                    Result.failure(Exception("Backend claim operation failed."))
+                }
+            } else {
+                Result.failure(Exception("Failed to claim campaign: ${response.message()}"))
             }
         } catch (e: Exception) {
             Result.failure(e)
@@ -55,7 +84,8 @@ class WorkRepositoryImpl @Inject constructor(
         durationSeconds: Int,
         callStatus: String,
         outcome: String?,
-        notes: String?
+        notes: String?,
+        nextReminderTime: Long?
     ): Result<String?> {
         return try {
             val request = CallLogSyncRequest(
@@ -64,7 +94,8 @@ class WorkRepositoryImpl @Inject constructor(
                 durationSeconds = durationSeconds,
                 callStatus = callStatus,
                 outcome = outcome,
-                notes = notes
+                notes = notes,
+                nextReminderTime = nextReminderTime
             )
             val response = apiService.syncCallLog(request)
             if (response.isSuccessful) {
@@ -120,16 +151,24 @@ class WorkRepositoryImpl @Inject constructor(
 
     override suspend fun deleteLeadsLocally(ids: List<String>) {
         if (ids.isEmpty()) return
-        try {
-            // SQLite has a hard limit of 999 bind parameters per query.
-            // Chunking into batches of 900 prevents a silent crash when the
-            // business owner deletes a large campaign (e.g. 1000+ leads at once).
-            ids.chunked(900).forEach { chunk ->
-                teleCallerDao.deleteLeadsByIds(chunk)
+        ids.chunked(900).forEach { chunk ->
+            teleCallerDao.deleteLeadsByIds(chunk)
+        }
+        Log.i("WorkRepository", "Locally deleted ${ids.size} leads via heartbeat command")
+    }
+
+    override suspend fun updateTelecallerStatus(status: String) {
+        withContext(Dispatchers.IO) {
+            val request = TelecallerStatusRequest(
+                status = status,
+                timestamp = System.currentTimeMillis()
+            )
+            val response = apiService.updateStatus(request)
+            if (response.isSuccessful) {
+                Log.i("WorkRepository", "Telecaller status updated to $status")
+            } else {
+                Log.w("WorkRepository", "Failed to update status: ${response.code()} ${response.message()}")
             }
-            Log.i("WorkRepository", "Locally deleted ${ids.size} leads via heartbeat command")
-        } catch (e: Exception) {
-            Log.e("WorkRepository", "Error deleting leads locally: ${e.message}")
         }
     }
 }

@@ -90,7 +90,8 @@ fun WhatsAppSendFlow(
                     }
                 }
             }
-        } else {
+        } else if (selectedTemplate != null) {
+            val template = selectedTemplate!!
             LazyColumn(
                 modifier = Modifier.padding(padding).fillMaxSize(),
                 contentPadding = PaddingValues(16.dp),
@@ -100,7 +101,7 @@ fun WhatsAppSendFlow(
                 items(uniqueContacts) { log ->
                     AppCard(
                         modifier = Modifier.clickable {
-                            sendWhatsApp(context, log.phoneNumber, selectedTemplate!!.message)
+                            sendWhatsApp(context, log.phoneNumber, template.message)
                             onBack()
                         },
                         elevation = 0.5.dp

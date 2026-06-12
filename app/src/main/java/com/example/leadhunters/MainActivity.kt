@@ -24,12 +24,12 @@ import androidx.navigation.navArgument
 import com.example.leadhunters.ui.theme.LeadHuntersTheme
 import com.example.leadhunters.ui.dashboard.DashboardScreen
 import com.example.leadhunters.ui.leads.LeadsScreen
-import com.example.leadhunters.ui.logs.CallLogsScreen
 import com.example.leadhunters.ui.completedleads.CompletedLeadsScreen
 import com.example.leadhunters.ui.reminders.RemindersScreen
 import com.example.leadhunters.ui.more.MoreScreen
 import com.example.leadhunters.ui.more.TemplateManagementScreen
 import com.example.leadhunters.ui.more.WhatsAppSendFlow
+import com.example.leadhunters.ui.campaigns.CampaignsScreen
 import com.example.leadhunters.ui.outcome.OutcomeFormScreen
 import com.example.leadhunters.ui.init.InitScreen
 import androidx.compose.ui.window.DialogProperties
@@ -78,6 +78,7 @@ class MainActivity : ComponentActivity() {
                                         workRepository.deleteLeadsLocally(deletedIds)
                                     }
                                 }
+                                workRepository.updateTelecallerStatus("idle")
                             }
                         } catch (e: Exception) {
                             // Silently fail, it's just a heartbeat
@@ -192,8 +193,8 @@ fun MainScreen() {
         bottomBar = {
             if (currentDestination != null && 
                 !currentDestination.startsWith("outcome/") && 
-                currentDestination != "initialization" &&
-                currentDestination != "dial") {
+                currentDestination != "initialization"
+                ) {
                 NavigationBar(
                     containerColor = MaterialTheme.colorScheme.background,
                     tonalElevation = 8.dp
@@ -251,12 +252,6 @@ fun MainScreen() {
                     onWhatsAppClick = { number -> navController.navigate("send_template/$number") }
                 )
             }
-            composable("dial") {
-                CallLogsScreen(
-                    onOutcomeClick = { callId -> navController.navigate("outcome/$callId") },
-                    onWhatsAppClick = { number -> navController.navigate("send_template/$number") }
-                )
-            }
             composable(
                 route = "send_template/{phoneNumber}",
                 arguments = listOf(navArgument("phoneNumber") { type = NavType.StringType; nullable = true })
@@ -289,6 +284,9 @@ fun MainScreen() {
             composable("send_template") {
                 // We'll implement this as a selection screen
                 WhatsAppSendFlow(onBack = { navController.popBackStack() })
+            }
+            composable("campaigns") {
+                CampaignsScreen(onBack = { navController.popBackStack() })
             }
         }
     }

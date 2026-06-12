@@ -19,5 +19,5 @@ interface AuthApiService {
 @androidx.annotation.Keep
 data class HeartbeatResponse(
     @com.google.gson.annotations.SerializedName("success") val success: Boolean,
-    @com.google.gson.annotations.SerializedName("deletedLeads") val deletedLeads: List<String>? = null
+    @com.google.gson.annotations.SerializedName("deleted_leads") val deletedLeads: List<String>? = null
 )

@@ -15,6 +15,8 @@ class AppUpdater @Inject constructor(
     private val appApiService: AppApiService,
     @ApplicationContext private val context: Context
 ) {
+    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private var downloadJob: Job? = null
     suspend fun checkForUpdate(): UpdateResult = withContext(Dispatchers.IO) {
         val currentVersionCode = try {
             val packageInfo = context.packageManager.getPackageInfo(context.packageName, 0)
@@ -83,21 +85,21 @@ class AppUpdater @Inject constructor(
         
         // Start monitoring progress
         _downloadProgress.value = 0
-        @OptIn(DelicateCoroutinesApi::class)
-        GlobalScope.launch(Dispatchers.IO) {
+        downloadJob?.cancel()
+        downloadJob = scope.launch {
             var downloading = true
-            while (downloading) {
+            while (downloading && isActive) {
                 val query = DownloadManager.Query().setFilterById(downloadId)
                 val cursor = downloadManager.query(query)
                 if (cursor != null && cursor.moveToFirst()) {
                     val downloadedIdx = cursor.getColumnIndex(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR)
                     val totalIdx = cursor.getColumnIndex(DownloadManager.COLUMN_TOTAL_SIZE_BYTES)
                     val statusIdx = cursor.getColumnIndex(DownloadManager.COLUMN_STATUS)
-                    
+
                     if (downloadedIdx != -1 && totalIdx != -1) {
                         val bytesDownloaded = cursor.getInt(downloadedIdx)
                         val bytesTotal = cursor.getInt(totalIdx)
-                        
+
                         if (statusIdx != -1 && cursor.getInt(statusIdx) == DownloadManager.STATUS_SUCCESSFUL) {
                             downloading = false
                             _downloadProgress.value = 100

@@ -39,13 +39,12 @@ fun MoreScreen(navController: NavController) {
         ) {
             item {
                 MoreItem(
-                    icon = Icons.Default.Dialpad,
-                    title = "Dial",
-                    subtitle = "Open the dial pad to make a call",
-                    onClick = { navController.navigate("dial") }
+                    icon = Icons.Default.List,
+                    title = "Campaigns",
+                    subtitle = "Claim new leads from available campaigns",
+                    onClick = { navController.navigate("campaigns") }
                 )
             }
-
             item {
                 MoreItem(
                     icon = Icons.AutoMirrored.Filled.Message,

@@ -2,6 +2,7 @@ package com.example.leadhunters.data.repository
 
 import com.example.leadhunters.data.local.entities.AppCallLog
 import com.example.leadhunters.data.local.entities.Lead
+import com.example.leadhunters.data.local.entities.ProcessedLead
 import com.example.leadhunters.data.local.entities.Reminder
 import kotlinx.coroutines.flow.Flow
 
@@ -11,7 +12,7 @@ interface CallRepository {
     suspend fun insertLead(lead: Lead)
     fun getCallLogs(cutoffTime: Long): Flow<List<AppCallLog>>
     suspend fun startCall(leadId: String?, phoneNumber: String): Long
-    suspend fun finalizeCall(callLogId: Long, duration: Long, status: String, systemCallLogId: Long? = null)
+    suspend fun finalizeCall(callLogId: Long, duration: Long, status: String, systemCallLogId: Long? = null, recordingPath: String? = null)
     suspend fun getLogById(id: Long): AppCallLog?
     suspend fun updateLog(callLog: AppCallLog)
     suspend fun isSystemCallLogReconciled(systemId: Long): Boolean
@@ -27,4 +28,9 @@ interface CallRepository {
 
     // Sync
     suspend fun enqueueSync(item: com.example.leadhunters.data.local.entities.SyncItem)
+
+    // Processed Leads
+    fun getProcessedLeads(): Flow<List<ProcessedLead>>
+    suspend fun insertProcessedLead(processedLead: ProcessedLead)
+    suspend fun updateProcessedLeadOutcome(callLogId: Long, outcome: String)
 }

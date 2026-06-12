@@ -98,26 +98,22 @@ class CallReconciler @Inject constructor(
                                 null
                             }
 
-                            // 2. Save duration/status
+                            // 2. Save duration/status + recording path atomically
                             repository.finalizeCall(
                                 callLogId = pendingLog.id,
                                 duration = duration,
                                 status = status,
-                                systemCallLogId = systemId
+                                systemCallLogId = systemId,
+                                recordingPath = recordingPath
                             )
 
-                            // 3. Update with recording path IMMEDIATELY if found
                             if (recordingPath != null) {
-                                Log.i("CallReconciler", "Updating log ${pendingLog.id} with recording: $recordingPath")
-                                val currentLog = repository.getLogById(pendingLog.id)
-                                if (currentLog != null) {
-                                    repository.updateLog(currentLog.copy(recordingPath = recordingPath))
-                                }
+                                Log.i("CallReconciler", "Recording saved for log ${pendingLog.id}: $recordingPath")
                             } else {
                                 Log.w("CallReconciler", "No recording found for call with $phoneNumber at $date")
                             }
 
-                            // 4. Update leadId if needed
+                            // 3. Update leadId if needed
                             if (pendingLog.leadId == "AD_HOC" && leadId != null) {
                                 val currentLog = repository.getLogById(pendingLog.id)
                                 if (currentLog != null) {
@@ -135,7 +131,26 @@ class CallReconciler @Inject constructor(
                                     payload = "" 
                                 )
                             )
-                            
+
+                            // 6. Insert into processed_leads (snapshot survives campaign switches)
+                            val effectiveLeadId = if (pendingLog.leadId == "AD_HOC" && leadId != null) leadId else pendingLog.leadId
+                            val leadRecord = repository.getLeadById(effectiveLeadId)
+                            repository.insertProcessedLead(
+                                com.example.leadhunters.data.local.entities.ProcessedLead(
+                                    callLogId = pendingLog.id,
+                                    leadId = effectiveLeadId,
+                                    name = leadRecord?.name ?: pendingLog.phoneNumber,
+                                    phoneNumber = pendingLog.phoneNumber,
+                                    campaignName = leadRecord?.campaignName ?: "Previous Campaign",
+                                    additionalData = leadRecord?.additionalData,
+                                    callStatus = status,
+                                    outcome = null,
+                                    callTimestamp = pendingLog.startTime,
+                                    duration = duration,
+                                    recordingPath = recordingPath
+                                )
+                            )
+
                             Log.i("CallReconciler", "Successfully reconciled log ${pendingLog.id} with system ID $systemId")
                             analyticsHelper.logReconciliation(phoneNumber, true, "Matched system ID $systemId")
                             

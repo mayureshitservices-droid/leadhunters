@@ -5,6 +5,8 @@ import android.media.MediaPlayer
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
+import android.provider.MediaStore
+import android.util.Log
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -56,33 +58,50 @@ class CallPlaybackManager @Inject constructor(
             return
         }
 
-        // Stop current if playing something else
         if (_state.value.currentLogId != logId) {
             stop()
         }
 
         try {
             if (mediaPlayer == null) {
-                val newPlayer = MediaPlayer.create(context, Uri.fromFile(file))
+                val possibleUris = buildList {
+                    val mediaStoreUri = resolveMediaStoreUri(filePath)
+                    if (mediaStoreUri != null) add(mediaStoreUri)
+                    val file = File(filePath)
+                    if (file.exists()) add(Uri.fromFile(file))
+                }
+
+                var newPlayer: MediaPlayer? = null
+                var usedUri: Uri? = null
+                for (uri in possibleUris) {
+                    newPlayer = MediaPlayer.create(context, uri)
+                    if (newPlayer != null) {
+                        usedUri = uri
+                        Log.i("CallPlaybackManager", "Created player with: $uri")
+                        break
+                    }
+                    Log.w("CallPlaybackManager", "MediaPlayer.create failed for: $uri")
+                }
+
                 if (newPlayer == null) {
+                    Log.e("CallPlaybackManager", "All URI strategies failed for $filePath")
                     _state.value = _state.value.copy(error = "Unsupported audio format or file corrupted")
-                    com.example.leadhunters.util.CrashReporter.log("ERROR: MediaPlayer.create returned null for $filePath")
                     return
                 }
-                
+
                 mediaPlayer = newPlayer.apply {
                     setOnCompletionListener {
                         stop()
                     }
                     setOnErrorListener { _, what, extra ->
-                        com.example.leadhunters.util.CrashReporter.log("ERROR: MediaPlayer error: $what, $extra")
+                        Log.e("CallPlaybackManager", "MediaPlayer error: what=$what extra=$extra")
                         _state.value = _state.value.copy(error = "Playback error occurred")
                         stop()
                         true
                     }
                 }
             }
-            
+
             mediaPlayer?.start()
             _state.value = _state.value.copy(
                 currentLogId = logId,
@@ -90,11 +109,31 @@ class CallPlaybackManager @Inject constructor(
                 duration = mediaPlayer?.duration ?: 0
             )
             handler.post(progressUpdater)
-            com.example.leadhunters.util.CrashReporter.log("Playback started for log $logId")
+            Log.i("CallPlaybackManager", "Playback started for log $logId: $filePath")
         } catch (e: Exception) {
-            com.example.leadhunters.util.CrashReporter.logError(e, "Error during playback initialization")
+            Log.e("CallPlaybackManager", "Error during playback initialization", e)
             _state.value = _state.value.copy(error = "Could not initialize player: ${e.message}")
             stop()
+        }
+    }
+
+    private fun resolveMediaStoreUri(filePath: String): Uri? {
+        return try {
+            val projection = arrayOf(MediaStore.Audio.Media._ID)
+            val selection = "${MediaStore.Audio.Media.DATA} = ?"
+            val selectionArgs = arrayOf(filePath)
+            context.contentResolver.query(
+                MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
+                projection, selection, selectionArgs, null
+            )?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    val id = cursor.getLong(0)
+                    Uri.withAppendedPath(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, id.toString())
+                } else null
+            }
+        } catch (e: Exception) {
+            Log.e("CallPlaybackManager", "Failed to resolve MediaStore URI", e)
+            null
         }
     }
 

@@ -16,9 +16,9 @@ object ShareUtils {
             val cachePath = File(context.cacheDir, "shared_images")
             cachePath.mkdirs()
             val file = File(cachePath, "performance_report.png")
-            val stream = FileOutputStream(file)
-            bitmap.compress(Bitmap.CompressFormat.PNG, 100, stream)
-            stream.close()
+            FileOutputStream(file).use { stream ->
+                bitmap.compress(Bitmap.CompressFormat.PNG, 100, stream)
+            }
 
             val contentUri = FileProvider.getUriForFile(
                 context,

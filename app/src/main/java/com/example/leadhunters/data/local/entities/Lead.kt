@@ -1,5 +1,6 @@
 package com.example.leadhunters.data.local.entities
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
@@ -10,7 +11,7 @@ data class Lead(
     val phoneNumber: String,
     val status: String = "PENDING",
     val businessOwnerId: String,
-    val businessOwnerName: String,
+    @ColumnInfo(name = "businessOwnerName") val campaignName: String,
     val lastCallTimestamp: Long? = null,
     val callCount: Int = 0,
     val additionalData: Map<String, Any>? = null

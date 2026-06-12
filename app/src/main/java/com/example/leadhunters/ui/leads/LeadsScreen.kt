@@ -10,17 +10,12 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.CallMade
-import androidx.compose.material.icons.automirrored.filled.CallMissed
-import androidx.compose.material.icons.automirrored.filled.HelpOutline
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -39,7 +34,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.leadhunters.data.local.entities.Lead
 import com.example.leadhunters.data.local.entities.AppCallLog
 import com.example.leadhunters.service.CallService
-import com.example.leadhunters.ui.components.AppBadge
 import com.example.leadhunters.ui.theme.SuccessEmerald
 import com.example.leadhunters.ui.logs.PlaybackState
 import com.example.leadhunters.ui.components.CallStatusBadge
@@ -138,13 +132,6 @@ fun LeadsScreen(
                 .padding(padding)
                 .background(MaterialTheme.colorScheme.background)
         ) {
-            // Business Owner Filter Bar
-            BusinessOwnerFilterBar(
-                owners = uiState.businessOwners,
-                selectedId = uiState.selectedBusinessOwnerId,
-                onSelect = { viewModel.filterByBusinessOwner(it) }
-            )
-
             AnimatedVisibility(visible = isAutoDialActive) {
                 Surface(
                     color = MaterialTheme.colorScheme.primary,
@@ -202,7 +189,7 @@ fun LeadsScreen(
                         )
                         Spacer(modifier = Modifier.height(16.dp))
                         Text(
-                            "No leads found for this filter",
+                            "No leads available",
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -239,43 +226,6 @@ fun LeadsScreen(
 }
 
 @Composable
-fun BusinessOwnerFilterBar(
-    owners: List<BusinessOwnerFilter>,
-    selectedId: String?,
-    onSelect: (String?) -> Unit
-) {
-    LazyRow(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 8.dp),
-        contentPadding = PaddingValues(horizontal = 16.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        item {
-            FilterChip(
-                selected = selectedId == null,
-                onClick = { onSelect(null) },
-                label = { Text("All Owners") }
-            )
-        }
-        items(owners) { owner ->
-            FilterChip(
-                selected = selectedId == owner.id,
-                onClick = { onSelect(owner.id) },
-                label = { Text(owner.name) },
-                leadingIcon = {
-                    Icon(
-                        Icons.Default.Business,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-            )
-        }
-    }
-}
-
-@Composable
 fun LeadItemCard(
     item: LeadWithLog,
     playbackState: PlaybackState,
@@ -287,7 +237,7 @@ fun LeadItemCard(
     val lead = item.lead
     val latestLog = item.latestLog
     val hasLog = latestLog != null && latestLog.status != "PENDING"
-    val hasRecording = latestLog?.recordingPath != null && File(latestLog.recordingPath!!).exists()
+    val hasRecording = latestLog?.recordingPath != null && File(latestLog.recordingPath).exists()
     val isCurrentlyPlaying = playbackState.currentLogId == latestLog?.id && playbackState.isPlaying
 
     Card(
@@ -336,7 +286,7 @@ fun LeadItemCard(
                         ) {
                             Icon(Icons.Default.Business, contentDescription = null, modifier = Modifier.size(12.dp), tint = MaterialTheme.colorScheme.primary)
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text(text = lead.businessOwnerName, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                            Text(text = lead.campaignName, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
@@ -433,7 +383,7 @@ fun LeadItemCard(
                     ) {
                         // Playback Button
                         Button(
-                            onClick = { latestLog?.id?.let { onPlaybackToggle(it, latestLog.recordingPath!!) } },
+                            onClick = { latestLog?.let { log -> log.recordingPath?.let { path -> onPlaybackToggle(log.id, path) } } },
                             modifier = Modifier.weight(1f),
                             enabled = hasRecording,
                             colors = ButtonDefaults.buttonColors(

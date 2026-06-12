@@ -4,6 +4,7 @@ import androidx.room.*
 import com.example.leadhunters.data.local.entities.AppCallLog
 import com.example.leadhunters.data.local.entities.CallOutcome
 import com.example.leadhunters.data.local.entities.Lead
+import com.example.leadhunters.data.local.entities.ProcessedLead
 import com.example.leadhunters.data.local.entities.Reminder
 import com.example.leadhunters.data.local.entities.SyncItem
 import com.example.leadhunters.data.local.entities.WhatsAppTemplate
@@ -33,6 +34,12 @@ interface TeleCallerDao {
     @Update
     suspend fun updateLead(lead: Lead)
 
+    @Transaction
+    suspend fun clearAndInsertLeads(leads: List<Lead>) {
+        clearLeads()
+        insertLeads(leads)
+    }
+
     // Call Logs
     @Query("SELECT * FROM app_call_logs WHERE startTime >= :cutoffTime ORDER BY startTime DESC")
     fun getAllCallLogs(cutoffTime: Long): Flow<List<AppCallLog>>
@@ -57,6 +64,16 @@ interface TeleCallerDao {
 
     @Query("SELECT EXISTS(SELECT 1 FROM app_call_logs WHERE systemCallLogId = :systemId)")
     suspend fun isSystemCallLogReconciled(systemId: Long): Boolean
+
+    // Processed Leads
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertProcessedLead(processedLead: ProcessedLead)
+
+    @Query("UPDATE processed_leads SET outcome = :outcome WHERE callLogId = :callLogId")
+    suspend fun updateProcessedLeadOutcome(callLogId: Long, outcome: String)
+
+    @Query("SELECT * FROM processed_leads ORDER BY callTimestamp DESC")
+    fun getAllProcessedLeads(): Flow<List<ProcessedLead>>
 
     // Outcomes
     @Insert(onConflict = OnConflictStrategy.REPLACE)

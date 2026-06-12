@@ -6,6 +6,7 @@ import com.example.leadhunters.data.local.dao.TeleCallerDao
 import com.example.leadhunters.data.local.entities.AppCallLog
 import com.example.leadhunters.data.local.entities.CallOutcome
 import com.example.leadhunters.data.local.entities.Lead
+import com.example.leadhunters.data.local.entities.ProcessedLead
 import com.example.leadhunters.data.local.entities.Reminder
 import com.example.leadhunters.data.local.entities.SyncItem
 import com.example.leadhunters.data.local.entities.WhatsAppTemplate
@@ -13,8 +14,8 @@ import com.example.leadhunters.data.local.entities.WhatsAppTemplate
 import androidx.room.TypeConverters
 
 @Database(
-    entities = [Lead::class, AppCallLog::class, CallOutcome::class, SyncItem::class, WhatsAppTemplate::class, Reminder::class],
-    version = 6,
+    entities = [Lead::class, AppCallLog::class, CallOutcome::class, SyncItem::class, WhatsAppTemplate::class, Reminder::class, ProcessedLead::class],
+    version = 8,
     exportSchema = false
 )
 @TypeConverters(Converters::class)

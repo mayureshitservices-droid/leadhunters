@@ -19,9 +19,7 @@ import javax.inject.Inject
 data class LeadsUiState(
     val leads: List<LeadWithLog> = emptyList(),
     val isLoading: Boolean = false,
-    val error: String? = null,
-    val selectedBusinessOwnerId: String? = null,
-    val businessOwners: List<BusinessOwnerFilter> = emptyList()
+    val error: String? = null
 )
 
 data class LeadWithLog(
@@ -30,11 +28,6 @@ data class LeadWithLog(
     val latestOutcome: com.example.leadhunters.data.local.entities.CallOutcome? = null,
     val isSyncing: Boolean = false,
     val hasAnyOutcome: Boolean = false
-)
-
-data class BusinessOwnerFilter(
-    val id: String,
-    val name: String
 )
 
 @HiltViewModel
@@ -48,7 +41,6 @@ class LeadsViewModel @Inject constructor(
     private val autoDialManager: com.example.leadhunters.data.system.AutoDialManager
 ) : ViewModel() {
 
-    private val _selectedBusinessOwnerId = MutableStateFlow<String?>(null)
     private val _isLoading = MutableStateFlow(false)
     private val _error = MutableStateFlow<String?>(null)
 
@@ -71,25 +63,21 @@ class LeadsViewModel @Inject constructor(
         callRepository.getCallLogs(System.currentTimeMillis() - (14L * 24 * 60 * 60 * 1000)),
         callRepository.getAllOutcomes(),
         teleCallerDao.getPendingSyncItems(),
-        _selectedBusinessOwnerId,
         _isLoading,
         _error
     ) { args ->
-        val leads = args[0] as List<com.example.leadhunters.data.local.entities.Lead>
-        val logs = args[1] as List<com.example.leadhunters.data.local.entities.AppCallLog>
-        val outcomes = args[2] as List<com.example.leadhunters.data.local.entities.CallOutcome>
-        val syncItems = args[3] as List<com.example.leadhunters.data.local.entities.SyncItem>
-        val selectedId = args[4] as String?
-        val loading = args[5] as Boolean
-        val error = args[6] as String?
+        @Suppress("UNCHECKED_CAST")
+        val leads = (args.getOrNull(0) as? List<com.example.leadhunters.data.local.entities.Lead>) ?: emptyList()
+        @Suppress("UNCHECKED_CAST")
+        val logs = (args.getOrNull(1) as? List<com.example.leadhunters.data.local.entities.AppCallLog>) ?: emptyList()
+        @Suppress("UNCHECKED_CAST")
+        val outcomes = (args.getOrNull(2) as? List<com.example.leadhunters.data.local.entities.CallOutcome>) ?: emptyList()
+        @Suppress("UNCHECKED_CAST")
+        val syncItems = (args.getOrNull(3) as? List<com.example.leadhunters.data.local.entities.SyncItem>) ?: emptyList()
+        val loading = args.getOrNull(4) as? Boolean ?: false
+        val error = args.getOrNull(5) as? String
 
-        val filteredLeads = if (selectedId == null) {
-            leads
-        } else {
-            leads.filter { it.businessOwnerId == selectedId }
-        }
-
-        val leadsWithLogs = filteredLeads.map { lead ->
+        val leadsWithLogs = leads.map { lead ->
             val leadLogs = logs.filter { it.leadId == lead.id || (it.leadId == "AD_HOC" && it.phoneNumber == lead.phoneNumber) }
             val latestLog = leadLogs.maxByOrNull { it.startTime }
             
@@ -101,17 +89,12 @@ class LeadsViewModel @Inject constructor(
             } ?: false
             
             LeadWithLog(lead, latestLog, latestOutcome, isSyncing, hasAnyOutcome)
-        }.filter { !it.hasAnyOutcome } // My Leads: only show leads that have NO outcome submitted yet
-
-        val owners = leads.map { BusinessOwnerFilter(it.businessOwnerId, it.businessOwnerName) }
-            .distinctBy { it.id }
+        }.filter { !it.hasAnyOutcome }
 
         LeadsUiState(
             leads = leadsWithLogs,
             isLoading = loading,
-            error = error,
-            selectedBusinessOwnerId = selectedId,
-            businessOwners = owners
+            error = error
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), LeadsUiState())
 
@@ -125,7 +108,6 @@ class LeadsViewModel @Inject constructor(
         viewModelScope.launch {
             autoDialManager.autoDialEvents.collect { lead ->
                 isTransitioning = true
-                startCall(lead)
                 lastProcessedLeadId = lead.id
                 lastProcessedLogId = null
                 delay(800)
@@ -150,16 +132,17 @@ class LeadsViewModel @Inject constructor(
                         if (latestLog.status == "ANSWERED") {
                             lastProcessedLogId = latestLog.id
                             _autoNavigateEvent.send(latestLog.id)
+                        } else {
+                            lastProcessedLogId = latestLog.id
+                            delay(800)
+                            triggerNextAutoDial()
                         }
                     }
                 } else if (!isTransitioning && lastProcessedLeadId != null) {
-                    // Safety: Only auto-trigger next if we can't find the current lead 
-                    // AND we haven't already started transitioning.
-                    // We also clear the ID to prevent multiple triggers from the same state emission.
                     lastProcessedLeadId = null
                     lastProcessedLogId = null
                     
-                    delay(800) // UI stability delay
+                    delay(800)
                     triggerNextAutoDial()
                 }
             }
@@ -182,14 +165,6 @@ class LeadsViewModel @Inject constructor(
                 autoDialManager.startAutoDial(currentLeads)
                 triggerNextAutoDial()
             }
-        }
-    }
-
-    fun filterByBusinessOwner(ownerId: String?) {
-        _selectedBusinessOwnerId.value = ownerId
-        // Safety: Stop auto-dial if filters change
-        if (autoDialManager.isActive()) {
-            stopAutoDial()
         }
     }
 
@@ -216,16 +191,7 @@ class LeadsViewModel @Inject constructor(
 
     fun refreshLeads() {
         viewModelScope.launch {
-            _isLoading.value = true
-            _error.value = null
-            workRepository.syncLeads()
-                .onFailure { _error.value = it.message }
-            
-            // Manual "Pull-to-Refresh" Auto-healing Sweep
-            // Scans for any stuck "Pending" logs from interrupted sessions
             performReconciliationSweep()
-            
-            _isLoading.value = false
         }
     }
 

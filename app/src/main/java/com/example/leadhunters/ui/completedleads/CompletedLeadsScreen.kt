@@ -1,17 +1,11 @@
 package com.example.leadhunters.ui.completedleads
 
-import android.content.Context
-import android.content.Intent
-import android.net.Uri
-import android.Manifest
-import android.content.pm.PackageManager
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -22,30 +16,27 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.leadhunters.data.local.entities.AppCallLog
-import com.example.leadhunters.data.local.entities.CallOutcome
-import com.example.leadhunters.data.local.entities.Lead
-import com.example.leadhunters.data.local.entities.SyncItem
 import com.example.leadhunters.data.repository.CallRepository
 import com.example.leadhunters.data.repository.WorkRepository
 import com.example.leadhunters.data.local.dao.TeleCallerDao
+import com.example.leadhunters.data.local.entities.AppCallLog
+import com.example.leadhunters.data.local.entities.Lead
+import com.example.leadhunters.data.local.entities.ProcessedLead
+import com.example.leadhunters.ui.components.CallStatusBadge
+import com.example.leadhunters.ui.components.LeadInsightsSection
 import com.example.leadhunters.ui.components.CallStatusBadge
 import com.example.leadhunters.ui.components.formatDuration
 import com.example.leadhunters.ui.components.formatDurationMs
-import com.example.leadhunters.ui.leads.BusinessOwnerFilter
+import com.example.leadhunters.ui.components.formatTimestamp
 import com.example.leadhunters.ui.leads.LeadWithLog
 import com.example.leadhunters.ui.logs.CallPlaybackManager
 import com.example.leadhunters.ui.logs.PlaybackState
-import com.example.leadhunters.ui.theme.PrimaryRed
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -56,9 +47,7 @@ import javax.inject.Inject
 
 data class CompletedLeadsUiState(
     val leads: List<LeadWithLog> = emptyList(),
-    val isLoading: Boolean = false,
-    val selectedBusinessOwnerId: String? = null,
-    val businessOwners: List<BusinessOwnerFilter> = emptyList()
+    val isLoading: Boolean = false
 )
 
 @HiltViewModel
@@ -69,53 +58,47 @@ class CompletedLeadsViewModel @Inject constructor(
     val playbackManager: CallPlaybackManager
 ) : ViewModel() {
 
-    private val _selectedBusinessOwnerId = MutableStateFlow<String?>(null)
-
     val playbackState = playbackManager.state
 
     val uiState: StateFlow<CompletedLeadsUiState> = combine(
-        workRepository.getLeads(),
+        callRepository.getProcessedLeads(),
         callRepository.getCallLogs(System.currentTimeMillis() - (14L * 24 * 60 * 60 * 1000)),
         callRepository.getAllOutcomes(),
-        teleCallerDao.getPendingSyncItems(),
-        _selectedBusinessOwnerId
-    ) { leads, logs, outcomes, syncItems, selectedId ->
-        val filteredLeads = if (selectedId == null) leads
-        else leads.filter { it.businessOwnerId == selectedId }
+        teleCallerDao.getPendingSyncItems()
+    ) { processedLeads, logs, outcomes, syncItems ->
+        val outcomeMap = outcomes.associateBy { it.callLogId }
 
-        val leadsWithLogs = filteredLeads.map { lead ->
-            // Find all logs for this lead
-            val leadLogs = logs.filter { it.leadId == lead.id || (it.leadId == "AD_HOC" && it.phoneNumber == lead.phoneNumber) }
-            
-            // Find the latest log that HAS an outcome
-            val latestLogWithOutcome = leadLogs
-                .filter { log -> outcomes.any { it.callLogId == log.id } }
-                .maxByOrNull { it.startTime }
-            
-            // For the Logs tab, we only care about leads with at least one outcome
-            val outcome = latestLogWithOutcome?.let { log -> outcomes.find { it.callLogId == log.id } }
+        val entries = processedLeads.map { pl ->
+            val outcome = outcomeMap[pl.callLogId]
+            val log = logs.find { it.id == pl.callLogId } ?: AppCallLog(
+                id = pl.callLogId,
+                leadId = pl.leadId,
+                phoneNumber = pl.phoneNumber,
+                startTime = pl.callTimestamp,
+                duration = pl.duration,
+                type = "OUTGOING",
+                status = pl.callStatus,
+                recordingPath = pl.recordingPath
+            )
 
-            val isSyncing = latestLogWithOutcome?.let { log ->
-                syncItems.any { it.type == "CALL_LOG" && it.referenceId == log.id.toString() && it.status == "PENDING" }
-            } ?: false
+            val lead = Lead(
+                id = pl.leadId,
+                name = pl.name,
+                phoneNumber = pl.phoneNumber,
+                businessOwnerId = "",
+                campaignName = pl.campaignName,
+                additionalData = pl.additionalData
+            )
 
-            LeadWithLog(lead, latestLogWithOutcome, outcome, isSyncing)
-        }.filter { it.latestOutcome != null }
-         .sortedByDescending { it.latestLog?.startTime ?: 0L }
+            val isSyncing = syncItems.any {
+                it.type == "CALL_LOG" && it.referenceId == pl.callLogId.toString() && it.status == "PENDING"
+            }
 
-        val owners = leads.map { BusinessOwnerFilter(it.businessOwnerId, it.businessOwnerName) }
-            .distinctBy { it.id }
+            LeadWithLog(lead, log, outcome, isSyncing, hasAnyOutcome = outcome != null)
+        }.sortedByDescending { it.latestLog?.startTime ?: 0L }
 
-        CompletedLeadsUiState(
-            leads = leadsWithLogs,
-            selectedBusinessOwnerId = selectedId,
-            businessOwners = owners
-        )
+        CompletedLeadsUiState(leads = entries)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), CompletedLeadsUiState())
-
-    fun filterByBusinessOwner(ownerId: String?) {
-        _selectedBusinessOwnerId.value = ownerId
-    }
 
     fun togglePlayback(logId: Long, filePath: String) {
         playbackManager.togglePlayback(logId, filePath)
@@ -155,13 +138,6 @@ fun CompletedLeadsScreen(
                 .padding(padding)
                 .background(MaterialTheme.colorScheme.background)
         ) {
-            // Business Owner Filter Bar
-            CompletedLeadsFilterBar(
-                owners = uiState.businessOwners,
-                selectedId = uiState.selectedBusinessOwnerId,
-                onSelect = { viewModel.filterByBusinessOwner(it) }
-            )
-
             if (uiState.leads.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -191,7 +167,7 @@ fun CompletedLeadsScreen(
                     contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    items(uiState.leads, key = { it.lead.id }) { leadWithLog ->
+                    items(uiState.leads, key = { it.latestLog?.id ?: it.lead.id }) { leadWithLog ->
                         CompletedLeadCard(
                             item = leadWithLog,
                             playbackState = playbackState,
@@ -206,43 +182,6 @@ fun CompletedLeadsScreen(
 }
 
 @Composable
-fun CompletedLeadsFilterBar(
-    owners: List<BusinessOwnerFilter>,
-    selectedId: String?,
-    onSelect: (String?) -> Unit
-) {
-    LazyRow(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 8.dp),
-        contentPadding = PaddingValues(horizontal = 16.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        item {
-            FilterChip(
-                selected = selectedId == null,
-                onClick = { onSelect(null) },
-                label = { Text("All Owners") }
-            )
-        }
-        items(owners) { owner ->
-            FilterChip(
-                selected = selectedId == owner.id,
-                onClick = { onSelect(owner.id) },
-                label = { Text(owner.name) },
-                leadingIcon = {
-                    Icon(
-                        Icons.Default.Business,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-            )
-        }
-    }
-}
-
-@Composable
 fun CompletedLeadCard(
     item: LeadWithLog,
     playbackState: PlaybackState,
@@ -251,8 +190,8 @@ fun CompletedLeadCard(
 ) {
     val lead = item.lead
     val latestLog = item.latestLog
-    val outcome = item.latestOutcome!!  // guaranteed non-null in this screen
-    val hasRecording = latestLog?.recordingPath != null && File(latestLog.recordingPath!!).exists()
+    val outcome = item.latestOutcome
+    val hasRecording = latestLog?.recordingPath != null && File(latestLog.recordingPath).exists()
     val isCurrentlyPlaying = playbackState.currentLogId == latestLog?.id && playbackState.isPlaying
 
     Card(
@@ -292,13 +231,13 @@ fun CompletedLeadCard(
                         ) {
                             Icon(Icons.Default.Business, contentDescription = null, modifier = Modifier.size(12.dp), tint = MaterialTheme.colorScheme.primary)
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text(text = lead.businessOwnerName, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                            Text(text = lead.campaignName, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
 
-                // Outcome badge top-right
-                CallStatusBadge(status = outcome.outcomeType)
+                // Outcome badge top-right (or call status if no outcome yet)
+                CallStatusBadge(status = outcome?.outcomeType ?: item.latestLog?.status ?: "PENDING")
             }
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -310,7 +249,22 @@ fun CompletedLeadCard(
                 Text(text = lead.phoneNumber, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Medium)
             }
 
+            LeadInsightsSection(
+                additionalData = lead.additionalData,
+                modifier = Modifier.padding(top = 8.dp)
+            )
+
             HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+
+            // Call timestamp
+            latestLog?.let { log ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.CalendarToday, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(text = formatTimestamp(log.startTime), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Spacer(modifier = Modifier.height(6.dp))
+            }
 
             // Call duration row
             latestLog?.let { log ->
@@ -322,33 +276,35 @@ fun CompletedLeadCard(
                 Spacer(modifier = Modifier.height(10.dp))
             }
 
-            // Outcome details card
-            Surface(
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(modifier = Modifier.padding(12.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Person, contentDescription = null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.primary)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = outcome.customerName,
-                            style = MaterialTheme.typography.bodySmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                    if (!outcome.remarks.isNullOrBlank()) {
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Row(verticalAlignment = Alignment.Top) {
-                            Icon(Icons.Default.Notes, contentDescription = null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            // Outcome details card (only if outcome exists)
+            if (outcome != null) {
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Person, contentDescription = null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.primary)
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = outcome.remarks,
+                                text = outcome.customerName,
                                 style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
                             )
+                        }
+                        if (!outcome.remarks.isNullOrBlank()) {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Row(verticalAlignment = Alignment.Top) {
+                                Icon(Icons.Default.Notes, contentDescription = null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = outcome.remarks,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                         }
                     }
                 }
@@ -362,7 +318,7 @@ fun CompletedLeadCard(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Button(
-                    onClick = { latestLog?.id?.let { onPlaybackToggle(it, latestLog.recordingPath!!) } },
+                    onClick = { latestLog?.let { log -> log.recordingPath?.let { path -> onPlaybackToggle(log.id, path) } } },
                     modifier = Modifier.weight(1f),
                     enabled = hasRecording,
                     colors = ButtonDefaults.buttonColors(
