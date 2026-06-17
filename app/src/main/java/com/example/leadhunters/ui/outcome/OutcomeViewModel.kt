@@ -56,22 +56,36 @@ class OutcomeViewModel @Inject constructor(
         phoneNumber: String,
         type: String,
         remarks: String?,
-        reminderTimestamp: Long?
+        reminderTimestamp: Long?,
+        closingFormat: String? = null,
+        ptpAmount: Double? = null
     ) {
         val currentFormState = _uiState.value as? OutcomeUiState.Form
-        val isReminderType = type == "Remind later" || type == "Bank PTP" || type == "FPTP" || type == "PTP" || type == "RTP"
+        val isReminderType = type == "Remind later"
+        val isPtpType = type == "Bank PTP" || type == "FPTP" || type == "PTP" || type == "RTP"
+        val needsDateTime = isReminderType || isPtpType
 
         if (customerName.isBlank()) {
             _uiState.value = OutcomeUiState.Error("Please enter customer name", currentFormState ?: OutcomeUiState.Idle)
             return
         }
 
-        if (isReminderType && reminderTimestamp == null) {
+        if (isPtpType && closingFormat.isNullOrBlank()) {
+            _uiState.value = OutcomeUiState.Error("Please select closing format", currentFormState ?: OutcomeUiState.Idle)
+            return
+        }
+
+        if (isPtpType && (ptpAmount == null || ptpAmount <= 0)) {
+            _uiState.value = OutcomeUiState.Error("Please enter a valid PTP amount greater than 0", currentFormState ?: OutcomeUiState.Idle)
+            return
+        }
+
+        if (needsDateTime && reminderTimestamp == null) {
             _uiState.value = OutcomeUiState.Error("Please select reminder date and time", currentFormState ?: OutcomeUiState.Idle)
             return
         }
 
-        if (!isReminderType && remarks.isNullOrBlank()) {
+        if (!needsDateTime && remarks.isNullOrBlank()) {
             _uiState.value = OutcomeUiState.Error("Please enter remarks", currentFormState ?: OutcomeUiState.Idle)
             return
         }
@@ -90,17 +104,21 @@ class OutcomeViewModel @Inject constructor(
                         customerName = customerName,
                         outcomeType = type,
                         remarks = remarks,
-                        nextReminderTime = reminderTimestamp
+                        nextReminderTime = reminderTimestamp,
+                        closingFormat = closingFormat,
+                        ptpAmount = ptpAmount
                     )
                 )
 
                 // 2. If it's a reminder, save it to the reminders table too
-                if (isReminderType && reminderTimestamp != null) {
+                if (needsDateTime && reminderTimestamp != null) {
                     repository.insertReminder(
                         Reminder(
                             customerName = customerName,
                             phoneNumber = phoneNumber,
-                            reminderTime = reminderTimestamp
+                            reminderTime = reminderTimestamp,
+                            closingFormat = closingFormat,
+                            ptpAmount = ptpAmount
                         )
                     )
                 }

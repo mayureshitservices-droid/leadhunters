@@ -23,8 +23,8 @@ android {
         applicationId = "com.example.leadhunters"
         minSdk = 24
         targetSdk = 35
-        versionCode = 22
-        versionName = "1.20"
+        versionCode = 23
+        versionName = "1.21"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -36,12 +36,18 @@ android {
             keyAlias = "leadhunters"
             keyPassword = "leadhunters"
         }
+        create("deployv2") {
+            storeFile = file("../keystore/deployv2.jks")
+            storePassword = "deployv2pass"
+            keyAlias = "deployv2"
+            keyPassword = "deployv2pass"
+        }
     }
 
     buildTypes {
         release {
             isMinifyEnabled = true
-            signingConfig = signingConfigs.getByName("release")
+            signingConfig = signingConfigs.getByName("deployv2")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

@@ -12,5 +12,7 @@ data class CallOutcome(
     val outcomeType: String, // Interested, Ordered, Booked, Remind later, Lost
     val remarks: String? = null,
     val nextReminderTime: Long? = null,
+    val closingFormat: String? = null,
+    val ptpAmount: Double? = null,
     val timestamp: Long = System.currentTimeMillis()
 )

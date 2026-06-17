@@ -82,6 +82,20 @@ fun ReminderItem(reminder: Reminder, format: SimpleDateFormat) {
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(text = format.format(Date(reminder.reminderTime)), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
                 }
+                if (reminder.closingFormat != null || reminder.ptpAmount != null) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        reminder.closingFormat?.let {
+                            Text(text = "Closing: $it", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
+                        }
+                        if (reminder.closingFormat != null && reminder.ptpAmount != null) {
+                            Text(text = "  |  ", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
+                        }
+                        reminder.ptpAmount?.let {
+                            Text(text = "Amount: ₹${"%,.2f".format(it)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
+                        }
+                    }
+                }
             }
             
             IconButton(

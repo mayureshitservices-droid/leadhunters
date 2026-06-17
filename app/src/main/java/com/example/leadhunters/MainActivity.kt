@@ -149,16 +149,10 @@ class MainActivity : ComponentActivity() {
 
                 if (updateResult is com.example.leadhunters.updater.UpdateResult.Error) {
                     val error = updateResult as com.example.leadhunters.updater.UpdateResult.Error
-                    AlertDialog(
-                        onDismissRequest = { updateResult = com.example.leadhunters.updater.UpdateResult.NoUpdate },
-                        title = { Text("Update Check Failed") },
-                        text = { Text(error.message) },
-                        confirmButton = {
-                            TextButton(onClick = { updateResult = com.example.leadhunters.updater.UpdateResult.NoUpdate }) {
-                                Text("Dismiss")
-                            }
-                        }
-                    )
+                    android.util.Log.w("MainActivity", "Update check error: ${error.message}")
+                    LaunchedEffect(updateResult) {
+                        updateResult = com.example.leadhunters.updater.UpdateResult.NoUpdate
+                    }
                 }
 
                 com.example.leadhunters.ui.permissions.GlobalPermissionHandler {

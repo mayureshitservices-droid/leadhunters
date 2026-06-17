@@ -22,7 +22,9 @@ data class CallLogSyncRequest(
     @SerializedName("call_status") val callStatus: String,
     @SerializedName("outcome") val outcome: String? = null,
     @SerializedName("notes") val notes: String? = null,
-    @SerializedName("next_reminder_time") val nextReminderTime: Long? = null
+    @SerializedName("next_reminder_time") val nextReminderTime: Long? = null,
+    @SerializedName("closing_format") val closingFormat: String? = null,
+    @SerializedName("ptp_amount") val ptpAmount: Double? = null
 )
 
 @androidx.annotation.Keep

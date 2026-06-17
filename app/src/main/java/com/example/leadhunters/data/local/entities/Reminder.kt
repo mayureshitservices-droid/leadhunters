@@ -10,5 +10,7 @@ data class Reminder(
     val phoneNumber: String,
     val reminderTime: Long,
     val status: String = "PENDING", // PENDING, COMPLETED, DISMISSED
+    val closingFormat: String? = null,
+    val ptpAmount: Double? = null,
     val createdAt: Long = System.currentTimeMillis()
 )

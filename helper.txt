@@ -1,2 +1,0 @@
-adb shell setprop debug.firebase.analytics.app com.example.leadhunters
-adb logcat | findstr /i "leadhunters.decisionmakers.in"

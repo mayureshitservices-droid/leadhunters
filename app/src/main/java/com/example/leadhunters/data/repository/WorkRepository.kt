@@ -15,7 +15,9 @@ interface WorkRepository {
         callStatus: String,
         outcome: String? = null,
         notes: String? = null,
-        nextReminderTime: Long? = null
+        nextReminderTime: Long? = null,
+        closingFormat: String? = null,
+        ptpAmount: Double? = null
     ): Result<String?> // Return server log ID
 
     suspend fun uploadRecording(

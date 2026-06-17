@@ -60,7 +60,7 @@ fun OutcomeFormScreen(
                     initialName = state.customerName,
                     phoneNumber = state.phoneNumber,
                     modifier = Modifier.padding(padding),
-                    onSubmit = { name, type, remarks, reminderTime ->
+                    onSubmit = { name, type, remarks, reminderTime, closingFormat, ptpAmount ->
                         viewModel.submitOutcome(
                             state.callId,
                             state.leadId,
@@ -68,7 +68,9 @@ fun OutcomeFormScreen(
                             state.phoneNumber,
                             type,
                             remarks,
-                            reminderTime
+                            reminderTime,
+                            closingFormat,
+                            ptpAmount
                         )
                     }
                 )
@@ -91,7 +93,7 @@ fun OutcomeForm(
     initialName: String,
     phoneNumber: String,
     modifier: Modifier = Modifier,
-    onSubmit: (String, String, String?, Long?) -> Unit
+    onSubmit: (String, String, String?, Long?, String?, Double?) -> Unit
 ) {
     var customerName by rememberSaveable { mutableStateOf(initialName) }
     var selectedType by rememberSaveable { mutableStateOf("Lost") }
@@ -106,6 +108,13 @@ fun OutcomeForm(
     
     var showDatePicker by rememberSaveable { mutableStateOf(false) }
     var showTimePicker by rememberSaveable { mutableStateOf(false) }
+    
+    // PTP States
+    var selectedClosingFormat by rememberSaveable { mutableStateOf<String?>(null) }
+    var ptpAmountText by rememberSaveable { mutableStateOf("") }
+    var closingFormatExpanded by remember { mutableStateOf(false) }
+    
+    val closingFormats = listOf("FORECLOSURE", "EMI", "SETTLEMENT", "Partial Paid")
 
     val types = listOf(
         "Remind later",
@@ -141,7 +150,8 @@ fun OutcomeForm(
         "Language Issue",
         "Sale Done"
     )
-    val isReminder = selectedType == "Remind later" || selectedType == "Bank PTP" || selectedType == "FPTP" || selectedType == "PTP" || selectedType == "RTP"
+    val isReminder = selectedType == "Remind later"
+    val isPtp = selectedType == "Bank PTP" || selectedType == "FPTP" || selectedType == "PTP" || selectedType == "RTP"
 
     val dateFormatter = remember { SimpleDateFormat("dd MMM yyyy", Locale.getDefault()) }
 
@@ -202,14 +212,14 @@ fun OutcomeForm(
             }
         }
 
-        AnimatedVisibility(visible = !isReminder) {
+        AnimatedVisibility(visible = !isReminder && !isPtp) {
             OutlinedTextField(
                 value = remarks,
                 onValueChange = { remarks = it },
                 label = { Text("Remarks") },
                 modifier = Modifier.fillMaxWidth(),
                 minLines = 3,
-                isError = !isReminder && remarks.isBlank(),
+                isError = !isReminder && !isPtp && remarks.isBlank(),
                 placeholder = { Text("Enter call details...") },
                 colors = OutlinedTextFieldDefaults.colors(
                     unfocusedBorderColor = com.example.leadhunters.ui.theme.PrimaryRed,
@@ -245,11 +255,112 @@ fun OutcomeForm(
             }
         }
 
+        AnimatedVisibility(visible = isPtp) {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("PTP Details", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+
+                // Closing Format Dropdown
+                ExposedDropdownMenuBox(
+                    expanded = closingFormatExpanded,
+                    onExpandedChange = { closingFormatExpanded = !closingFormatExpanded },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    OutlinedTextField(
+                        value = selectedClosingFormat ?: "",
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Closing Format") },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = closingFormatExpanded) },
+                        modifier = Modifier.menuAnchor().fillMaxWidth(),
+                        isError = false,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            unfocusedBorderColor = com.example.leadhunters.ui.theme.PrimaryRed,
+                            focusedBorderColor = com.example.leadhunters.ui.theme.PrimaryRed
+                        )
+                    )
+                    ExposedDropdownMenu(
+                        expanded = closingFormatExpanded,
+                        onDismissRequest = { closingFormatExpanded = false }
+                    ) {
+                        closingFormats.forEach { format ->
+                            DropdownMenuItem(
+                                text = { Text(format) },
+                                onClick = {
+                                    selectedClosingFormat = format
+                                    closingFormatExpanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+
+                // PTP Amount
+                OutlinedTextField(
+                    value = ptpAmountText,
+                    onValueChange = { newValue ->
+                        if (newValue.isEmpty() || newValue.matches(Regex("^\\d*\\.?\\d{0,2}$"))) {
+                            ptpAmountText = newValue
+                        }
+                    },
+                    label = { Text("PTP Amount") },
+                    placeholder = { Text("Enter amount") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    isError = ptpAmountText.isNotBlank() && (ptpAmountText.toDoubleOrNull() == null || ptpAmountText.toDoubleOrNull()!! <= 0),
+                    supportingText = if (ptpAmountText.isNotBlank() && (ptpAmountText.toDoubleOrNull() == null || ptpAmountText.toDoubleOrNull()!! <= 0)) {
+                        { Text("Amount must be greater than 0", color = MaterialTheme.colorScheme.error) }
+                    } else null,
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        unfocusedBorderColor = com.example.leadhunters.ui.theme.PrimaryRed,
+                        focusedBorderColor = com.example.leadhunters.ui.theme.PrimaryRed,
+                        errorBorderColor = com.example.leadhunters.ui.theme.PrimaryRed
+                    )
+                )
+
+                // Date Picker
+                OutlinedButton(
+                    onClick = { showDatePicker = true },
+                    modifier = Modifier.fillMaxWidth(),
+                    contentPadding = PaddingValues(16.dp)
+                ) {
+                    Icon(Icons.Default.CalendarMonth, contentDescription = null)
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(selectedDate?.let { dateFormatter.format(Date(it)) } ?: "Select Date")
+                }
+
+                // Time Picker
+                OutlinedButton(
+                    onClick = { showTimePicker = true },
+                    modifier = Modifier.fillMaxWidth(),
+                    contentPadding = PaddingValues(16.dp)
+                ) {
+                    Icon(Icons.Default.Schedule, contentDescription = null)
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(selectedTime?.let { "${it.first}:${it.second.toString().padStart(2, '0')}" } ?: "Select Time")
+                }
+
+                // Remarks (optional)
+                OutlinedTextField(
+                    value = remarks,
+                    onValueChange = { remarks = it },
+                    label = { Text("Remarks (optional)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 2,
+                    placeholder = { Text("Enter remarks...") },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        unfocusedBorderColor = com.example.leadhunters.ui.theme.PrimaryRed,
+                        focusedBorderColor = com.example.leadhunters.ui.theme.PrimaryRed
+                    )
+                )
+            }
+        }
+
         Spacer(modifier = Modifier.weight(1f))
 
         Button(
             onClick = {
-                val reminderTime = if (isReminder && selectedDate != null && selectedTime != null) {
+                val reminderTime = if ((isReminder || isPtp) && selectedDate != null && selectedTime != null) {
                     val calendar = Calendar.getInstance().apply {
                         timeInMillis = selectedDate!!
                         set(Calendar.HOUR_OF_DAY, selectedTime!!.first)
@@ -258,16 +369,24 @@ fun OutcomeForm(
                     calendar.timeInMillis
                 } else null
 
+                val ptpAmount = ptpAmountText.toDoubleOrNull()
+
                 onSubmit(
                     customerName,
                     selectedType,
                     remarks.ifBlank { null },
-                    reminderTime
+                    reminderTime,
+                    selectedClosingFormat,
+                    ptpAmount
                 )
             },
             modifier = Modifier.fillMaxWidth().height(56.dp),
             shape = MaterialTheme.shapes.medium,
-            enabled = customerName.isNotBlank() && (if (isReminder) (selectedDate != null && selectedTime != null) else remarks.isNotBlank())
+            enabled = customerName.isNotBlank() && when {
+                isPtp -> selectedClosingFormat != null && ptpAmountText.isNotBlank() && ptpAmountText.toDoubleOrNull() != null && ptpAmountText.toDoubleOrNull()!! > 0 && selectedDate != null && selectedTime != null
+                isReminder -> selectedDate != null && selectedTime != null
+                else -> remarks.isNotBlank()
+            }
         ) {
             Text("Submit Result", style = MaterialTheme.typography.titleMedium)
         }

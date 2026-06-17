@@ -2,6 +2,8 @@ package com.example.leadhunters.updater
 
 import android.app.DownloadManager
 import android.content.Context
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.net.Uri
 import android.os.Environment
 import android.content.pm.PackageManager
@@ -17,7 +19,19 @@ class AppUpdater @Inject constructor(
 ) {
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var downloadJob: Job? = null
+    private fun isNetworkAvailable(): Boolean {
+        val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val network = connectivityManager.activeNetwork ?: return false
+        val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return false
+        return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+    }
+
     suspend fun checkForUpdate(): UpdateResult = withContext(Dispatchers.IO) {
+        if (!isNetworkAvailable()) {
+            android.util.Log.d("AppUpdater", "No network, skipping update check")
+            return@withContext UpdateResult.NoUpdate
+        }
+
         val currentVersionCode = try {
             val packageInfo = context.packageManager.getPackageInfo(context.packageName, 0)
             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
@@ -60,10 +74,13 @@ class AppUpdater @Inject constructor(
                 android.util.Log.e("AppUpdater", errorMsg)
                 return@withContext UpdateResult.Error(errorMsg)
             }
+        } catch (e: java.net.UnknownHostException) {
+            android.util.Log.w("AppUpdater", "No network connectivity: ${e.message}")
+            return@withContext UpdateResult.NoUpdate
         } catch (e: Exception) {
             e.printStackTrace()
             android.util.Log.e("AppUpdater", "Connection error: ${e.message}")
-            return@withContext UpdateResult.Error("Connection error: ${e.message ?: "Unknown"}")
+            return@withContext UpdateResult.NoUpdate
         }
     }
 

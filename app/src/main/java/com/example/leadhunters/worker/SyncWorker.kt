@@ -93,12 +93,15 @@ class SyncWorker @AssistedInject constructor(
                         callStatus = callLog.status,
                         outcome = outcome?.outcomeType,
                         notes = outcome?.remarks,
-                        nextReminderTime = outcome?.nextReminderTime
+                        nextReminderTime = outcome?.nextReminderTime,
+                        closingFormat = outcome?.closingFormat,
+                        ptpAmount = outcome?.ptpAmount
                     )
                     
                     if (syncResult.isSuccess) {
                         val serverLogId = syncResult.getOrNull()
                         Log.i("SyncWorker", "Call log metadata synced. Server ID: $serverLogId")
+                        Log.i("SyncWorker", "Recording path: '${callLog.recordingPath}' (empty=${callLog.recordingPath.isNullOrEmpty()})")
                         
                         if (serverLogId != null && !callLog.recordingPath.isNullOrEmpty()) {
                             val recordingResult = workRepository.uploadRecording(

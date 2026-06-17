@@ -18,6 +18,7 @@ fun CallStatusBadge(status: String) {
     val (label, color, icon) = when (status.uppercase()) {
         "ANSWERED" -> Triple("Answered", SuccessEmerald, Icons.AutoMirrored.Filled.CallMade)
         "MISSED" -> Triple("Missed", ErrorCoral, Icons.AutoMirrored.Filled.CallMissed)
+        "NOT-CONNECTED" -> Triple("Not Connected", Color.Gray, Icons.Default.Block)
         "REJECTED", "UNANSWERED" -> Triple("Rejected", Color.Gray, Icons.Default.Block)
         else -> Triple(status, Color.Gray, Icons.AutoMirrored.Filled.HelpOutline)
     }
